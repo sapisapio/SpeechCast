@@ -15,9 +15,22 @@ namespace SpeechCastMe
     public partial class FormSettings : Form
     {
         public int VoiceVolme;
+        private readonly NotificationSoundPlayer previewSound = new NotificationSoundPlayer();
+        private ComboBox audioModeSelector;
         public FormSettings()
         {
             InitializeComponent();
+            checkBoxPlaySoundNewResponse.Visible = false;
+            checkBoxPlaySoundNewResevery.Visible = false;
+            checkBoxPlaySoundSync.Visible = false;
+            tabPage8.Text = "着信音";
+            audioModeSelector = new ComboBox { Name = "audioModeSelector", Location = new Point(9, 18), Width = 110, DropDownStyle = ComboBoxStyle.DropDownList };
+            audioModeSelector.Items.AddRange(new object[] { "読み上げ", "着信音", "無音" });
+            checkBoxPlaySoundNewResponse.Parent.Controls.Add(audioModeSelector);
+            checkBoxPlaySoundNewResponse.Parent.Controls.Add(new Label { Text = "新着があった更新ごとに1回通知します。", AutoSize = true, Location = new Point(9, 48) });
+            panelPlaySound.Enabled = true;
+            previewSound.Failed += message => MessageBox.Show(this, message, "着信音の試聴", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            FormClosed += delegate { previewSound.Dispose(); };
             System.Drawing.Text.InstalledFontCollection ifc =
                  new System.Drawing.Text.InstalledFontCollection();
 
@@ -52,6 +65,7 @@ namespace SpeechCastMe
 
         public void SetUserConfig(UserConfig userConfig)
         {
+            audioModeSelector.SelectedIndex = (int)userConfig.AudioMode;
             try
             {
                 this.NumericUpDownMaxSpeakingCharacterCount.Value = userConfig.MaxSpeakingCharacterCount;
@@ -217,13 +231,9 @@ namespace SpeechCastMe
             userConfig.ReduceFontSizeByWindowHeight = checkBoxReduceFontSizeByWindowHeight.Checked;
             userConfig.SpeakTextBetweenBracesEvenIfAAMode = checkBoxSpeakTextBetweenBraces.Checked;
             userConfig.AAModeInvervalMillsec = System.Convert.ToInt32(this.numericUpDownAAModeInvervalMillsec.Value);
-            userConfig.PlaySoundNewResponse = this.checkBoxPlaySoundNewResponse.Checked;
-            //ミミック勝手に改造　レスごとに着信音鳴らす設定項目追加
-            userConfig.PlaySoundNewResevery = this.checkBoxPlaySoundNewResevery.Checked;
-            //ミミック勝手に改造　ここまで
-            FormMain.Instance.toolStripButtonPlaySoundNewResponse.Checked = checkBoxPlaySoundNewResponse.Checked;
-            userConfig.PlaySoundNewResponseSync = this.checkBoxPlaySoundSync.Checked;
-            //userConfig.NewResponseSoundFilePath = this.textBoxSoundFilePath.Text;
+            userConfig.AudioMode = (AudioNotificationMode)audioModeSelector.SelectedIndex;
+            userConfig.PlaySoundNewResevery = false;
+            userConfig.PlaySoundNewResponseSync = false;
             userConfig.EditorFilePath = this.textBoxEditorFilePath.Text;
             userConfig.SpeaksResNumberWhenAAMode = this.checkBoxSpeaksResNumberWhenAAMode.Checked;
             userConfig.SpeakingTextWhenAAMode = this.textBoxSpeakingTextWhenAAMode.Text;
@@ -390,7 +400,7 @@ namespace SpeechCastMe
 
         private void UpdateUI()
         {
-            panelPlaySound.Enabled = checkBoxPlaySoundNewResponse.Checked;
+            panelPlaySound.Enabled = true;
 
             //foreach (Control control in panelPlaySound.Controls)
             //{
@@ -525,32 +535,12 @@ namespace SpeechCastMe
 
         private void buttonResSoundTest_Click(object sender, EventArgs e)
         {
-            if (listBoxNewResponseSoundFilePathes.Items.Count > 0 && listBoxNewResponseSoundFilePathes.SelectedIndex >= 0)
+            if (listBoxNewResponseSoundFilePathes.SelectedItem == null)
             {
-                var NewResponseSoundFilePath = listBoxNewResponseSoundFilePathes.SelectedItem.ToString();
-                //System.Console.WriteLine(NewResponseSoundFilePath);
-                //System.Console.WriteLine(soundIdx);
-                if (File.Exists(NewResponseSoundFilePath))
-                {
-                    try
-                    {
-                        //ミミック勝手に改造　テスト再生側もMP3対応
-                        //var newplaysound = new Microsoft.DirectX.AudioVideoPlayback.Audio(NewResponseSoundFilePath);
-                        //newplaysound.Volume = (-100 * (100 - FormMain.UserConfig.PlayVolume)) / 2;
-
-                        System.Windows.Media.MediaPlayer newplaysound;
-                        newplaysound = new System.Windows.Media.MediaPlayer();
-                        newplaysound.Open(new System.Uri(NewResponseSoundFilePath));
-                        newplaysound.Volume = FormMain.UserConfig.PlayVolume *0.01;
-                        newplaysound.Play();
-                        //ミミック勝手に改造　ここまで
-                    }
-                    catch (Exception ex)
-                    {
-                        FormMain.Instance.AddLog("PlaySoundNewResponse:{0}", ex.Message);
-                    }
-                }
+                MessageBox.Show(this, "音声ファイルを登録して選択してください。", "着信音の試聴");
+                return;
             }
+            previewSound.Play(listBoxNewResponseSoundFilePathes.SelectedItem.ToString(), FormMain.UserConfig.PlayVolume);
         }
 
         private void trackBarAutoScrollSpeed_ValueChanged(object sender, EventArgs e)

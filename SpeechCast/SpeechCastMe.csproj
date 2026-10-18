@@ -196,6 +196,8 @@
     <Compile Include="FormEditFontColors.Designer.cs">
       <DependentUpon>FormEditFontColors.cs</DependentUpon>
     </Compile>
+    <Compile Include="NotificationSoundPlayer.cs" />
+    <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />
     <Compile Include="FormMain.Appearance.cs" />
     <Compile Include="CaptionRasterizer.cs" />

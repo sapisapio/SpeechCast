@@ -132,6 +132,7 @@ namespace SpeechCastMe
             }
             set
             {
+                if (DateTime.UtcNow < audioMessageUntil) return;
                 if (this.toolStripStatusLabelCommunication.Text != value)
                 {
                     this.toolStripStatusLabelCommunication.Text = value;
@@ -797,14 +798,6 @@ namespace SpeechCastMe
                                     listViewResponses.Items.Add(res.CreateListViewItem());
                                 }
                                 listViewResponses.EndUpdate();
-
-
-                                if (next == true)
-                                {
-                                    NewResponseNumber = oldResponseCount + 1;
-                                    //AddLog(NewResponseNumber.ToString());
-                                    //PlaySoundNewResponse();
-                                }
                             }
                             listViewTime = stopWatch.ElapsedMilliseconds;
                             stopWatch.Reset();
@@ -853,6 +846,7 @@ namespace SpeechCastMe
                         }
                     }                    
                 }
+                if (result && updated) NotifyNewResponses(next, oldResponseCount, responses.Count);
                 return result;
         }
 
@@ -885,64 +879,6 @@ namespace SpeechCastMe
             }
         }
 
-        public SoundPlayer soundPlayerNewResponse = null;
-
-
-
-        private void PlaySoundNewResponse()
-        {
-            if (UserConfig.NewResponseSoundFilePathes.Count > 0 && UserConfig.PlaySoundNewResponse)
-            {
-                Random cRandom = new System.Random();
-                var soundIdx = cRandom.Next(UserConfig.NewResponseSoundFilePathes.Count);
-                var NewResponseSoundFilePath = UserConfig.NewResponseSoundFilePathes[soundIdx];
-                //System.Console.WriteLine(NewResponseSoundFilePath);
-                //System.Console.WriteLine(soundIdx);
-                if (File.Exists(NewResponseSoundFilePath))
-                {
-
-
-                    try
-                    {
-                        //MP3対応したかったが、同期再生が出来ずに挫折。誰か実装してくれ
-                        //ミミック勝手に改造　↑との事でMP3対応＆同期再生実装
-                        System.Windows.Media.MediaPlayer newplaysound;
-                        newplaysound = new System.Windows.Media.MediaPlayer();
-                        newplaysound.Open(new System.Uri(NewResponseSoundFilePath));
-
-                        while(!newplaysound.NaturalDuration.HasTimeSpan)//音声ファイルを読み込むまで待ってあげる
-                        {
-                            async void loadwait()
-                            {
-                                await Task.Delay(1);
-                            }
-                            loadwait();
-                        }
-
-                        int mediaduration = (int)newplaysound.NaturalDuration.TimeSpan.TotalMilliseconds +1;
-                        newplaysound.Volume = UserConfig.PlayVolume * 0.01;
-
-                        if (UserConfig.PlaySoundNewResponseSync)
-                        {
-                            newplaysound.Play();
-                            Thread.Sleep(mediaduration);
-                        }
-                        else
-                        {
-                            newplaysound.Play();
-                        }
-                        //ミミック勝手に改造　ここまで
-                    }
-                    catch (Exception ex)
-                    {
-                        AddLog("PlaySoundNewResponse:{0}", ex.Message);
-                    }
-
-                }
-            }
-
-        }
-
         private int GetResponsesScrollY(int no)
         {
             // 2026-10-18: resolve document coordinates after template/width changes.
@@ -958,9 +894,6 @@ namespace SpeechCastMe
         }
 
         private int currentResNumber_ = 0;
-        private int NewResponseNumber = 0;
-
-        static bool listviewdc = false;
         public int CurrentResNumber
         {
             get
@@ -1065,33 +998,6 @@ namespace SpeechCastMe
 
                 isSpeakingWarningMessage = false;
                 isSpeaking = true;
-                if (CurrentResNumber == NewResponseNumber)
-                {
-                    //ミミック勝手に改造　レス毎に効果音鳴らす用に追加
-                    if (UserConfig.PlaySoundNewResevery == true)
-                    {
-
-                        if (FormMain.listviewdc == false)
-                        {
-                            PlaySoundNewResponse();
-                            NewResponseNumber = NewResponseNumber + 1;
-                            
-                        }
-                        else
-                        {
-                            FormMain.listviewdc = false;
-                        }
-
-                    }
-                    else
-                    {
-
-                    }
-                    //ミミック勝手に改造　ここまで
-                }
-                else
-                {
-                }
                 StartSpeaking(text);
                 //コマンドライン引渡し
                 //ターゲット指定が空でなければ実行
@@ -1465,31 +1371,6 @@ namespace SpeechCastMe
             {
                 synthesizer.Volume = 0;
             }
-            if (CurrentResNumber == NewResponseNumber)
-            {
-                //ミミック勝手に改造　新着レス毎に効果音を鳴らさない方の調整
-                if (UserConfig.PlaySoundNewResevery == false)
-                {
-                    if (FormMain.listviewdc == false)
-                    {
-                        PlaySoundNewResponse();
-                        NewResponseNumber = NewResponseNumber + 1;
-                        FormMain.listviewdc = true;
-                    }
-                    else
-                    {
-                        FormMain.listviewdc = false;
-                    }
-                }
-                else
-                {
-
-
-
-                }
-                //ミミック勝手に改造　ここまで
-
-            }
             synthesizer.SpeakAsync(MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(pronounciationText));
         }
 
@@ -1501,6 +1382,7 @@ namespace SpeechCastMe
 
         private void StopSpeakingCore()
         {
+            notificationPlayer.Stop();
             FormCaption.Instance.CaptionText = "";
             synthesizer.SpeakAsyncCancelAll();
 
@@ -1881,8 +1763,8 @@ namespace SpeechCastMe
                     }
                     comboBoxCaptionNum1.SelectedIndex = 0;
                     comboBoxCaptionNum2.SelectedIndex = 0;
-                    toolStripButtonClickSound.Checked = UserConfig.NavigationSound;
-                    CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS, SET_FEATURE_ON_PROCESS, !UserConfig.NavigationSound);
+                    toolStripButtonClickSound.Checked = false;
+                    CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS, SET_FEATURE_ON_PROCESS, true);
 
                     FormCaption.Instance.Visible = UserConfig.CaptionVisible;
                     toolStripButtonAutoNextThread.Checked = UserConfig.AutoOpenNextThread;
@@ -1975,6 +1857,7 @@ namespace SpeechCastMe
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            notificationPlayer.Dispose();
             if (IsDesignPreview)
             {
                 timer.Stop(); timerWeb.Stop();
@@ -2004,11 +1887,8 @@ namespace SpeechCastMe
                     formSettings.GetUserConfig(UserConfig);
                     if (!UserConfig.AutoReloadAlertCaption)CaptionTextBuffer = textBoxDefaultCaption.Text;
                     FormCaption.Instance.Refresh();
-                    if (soundPlayerNewResponse != null)
-                    {
-                        soundPlayerNewResponse.Dispose();
-                        soundPlayerNewResponse = null;
-                    }
+                    notificationPlayer.Stop();
+                    SyncAudioModeUi();
                 }
             }
             finally
@@ -2318,7 +2198,7 @@ namespace SpeechCastMe
         {
             UserConfig.SpeakingVolume = toolStripTrackBarVoiceVolume.Value;
             toolStripTextBoxVoiceVolume.Text = toolStripTrackBarVoiceVolume.Value.ToString();
-            synthesizer.Volume = toolStripTrackBarVoiceVolume.Value;            
+            synthesizer.Volume = UserConfig.SpeakMode ? toolStripTrackBarVoiceVolume.Value : 0;
         }
         private void toolStripTrackBarPlayVolume_ValueChanged(object sender, EventArgs e)
 
@@ -2338,7 +2218,7 @@ namespace SpeechCastMe
                     {
                         UserConfig.SpeakingVolume = vol;
                         toolStripTrackBarVoiceVolume.Value = vol;
-                        synthesizer.Volume = toolStripTrackBarVoiceVolume.Value;
+                        synthesizer.Volume = UserConfig.SpeakMode ? toolStripTrackBarVoiceVolume.Value : 0;
                     }
                     else
                     {
@@ -2453,19 +2333,21 @@ namespace SpeechCastMe
 
         private void toolStripButtonSpeech_Click(object sender, EventArgs e)
         {
-            UserConfig.SpeakMode = !UserConfig.SpeakMode;
+            UserConfig.AudioMode = UserConfig.SpeakMode ? AudioNotificationMode.Silent : AudioNotificationMode.Speech;
+            SyncAudioModeUi();
         }
 
         private void toolStripButtonClickSound_Click(object sender, EventArgs e)
         {
-            UserConfig.NavigationSound = !UserConfig.NavigationSound;
-            CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS, SET_FEATURE_ON_PROCESS, !UserConfig.NavigationSound);
+            UserConfig.NavigationSound = false;
+            CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS, SET_FEATURE_ON_PROCESS, true);
 
         }
 
         private void toolStripButtonPlaySoundNewResponse_Click(object sender, EventArgs e)
         {
-            UserConfig.PlaySoundNewResponse = !UserConfig.PlaySoundNewResponse;
+            UserConfig.AudioMode = UserConfig.PlaySoundNewResponse ? AudioNotificationMode.Silent : AudioNotificationMode.Sound;
+            SyncAudioModeUi();
         }
 
         private void toolStripStatusLabelCommunication_Click(object sender, EventArgs e)

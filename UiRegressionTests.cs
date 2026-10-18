@@ -53,6 +53,19 @@ class UiRegressionTests
         }
         var old = (UserConfig)serializer.Deserialize(new StringReader("<UserConfig />"));
         Check(old.CommentLayout == "compact" && old.CommentTheme == "light", "older settings receive defaults");
+        var legacyAudio = (UserConfig)serializer.Deserialize(new StringReader("<UserConfig><SpeakMode>true</SpeakMode><PlaySoundNewResponse>true</PlaySoundNewResponse><NavigationSound>true</NavigationSound></UserConfig>"));
+        legacyAudio.SupplementSettings();
+        Check(legacyAudio.AudioMode == AudioNotificationMode.Speech && !legacyAudio.PlaySoundNewResponse && !legacyAudio.NavigationSound, "legacy simultaneous audio settings migrate to speech and suppress browser clicks");
+        foreach (AudioNotificationMode mode in Enum.GetValues(typeof(AudioNotificationMode)))
+        {
+            config.AudioMode = mode;
+            using (var writer = new StringWriter())
+            {
+                serializer.Serialize(writer, config);
+                var restored = (UserConfig)serializer.Deserialize(new StringReader(writer.ToString()));
+                Check(restored.AudioMode == mode && !(restored.SpeakMode && restored.PlaySoundNewResponse), "exclusive audio mode persists: " + mode);
+            }
+        }
         FormMain.UserConfig = config;
         config.CaptionFont.Name = "Yu Gothic UI";
         using (var bitmap = new Bitmap(640, 140, PixelFormat.Format32bppArgb))
@@ -98,6 +111,7 @@ class UiRegressionTests
         }
         BrowserChecks(sample);
         ToolbarChecks();
+        SoundChecks();
     }
 
     static object Script(WebBrowser browser, string name, params object[] args) { return browser.Document.InvokeScript(name, args); }
@@ -130,12 +144,84 @@ class UiRegressionTests
             Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Left, "right-aligned update zoom and bottom controls keep intended order");
             Check(url.Items.Count == 4 && url.Items[0] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row starts with field and contains keyword and toggle");
             Check(((ToolStripButton)Field(form,"toolStripButtonAutoUpdate")).Text == "🔽" && ((ToolStripButton)Field(form,"toolStripButtonTurbo")).Text == "ターボ", "update emoji and explicit turbo label retained");
+            var modes = (ToolStripComboBox)Field(form,"audioModeSelector");
+            Check(modes.Owner == voice && modes.Items.Count == 3 && ((ToolStripItem)Field(form,"toolStripButtonClickSound")).Owner == null, "audio selector replaces independent toggles and removes reload sound");
+            modes.SelectedIndex = (int)AudioNotificationMode.Sound;
+            Check(FormMain.UserConfig.PlaySoundNewResponse && !FormMain.UserConfig.SpeakMode && !((ToolStripItem)Field(form,"toolStripTrackBarVoiceVolume")).Enabled && ((ToolStripItem)Field(form,"toolStripTrackBarPlayVolume")).Enabled, "sound mode enables only notification volume");
+            typeof(FormMain).GetProperty("communicationStatusString", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(form,"polling countdown",null);
+            Check(((ToolStripStatusLabel)Field(form,"toolStripStatusLabelCommunication")).Text.Contains("登録"), "missing sound configuration message remains visible through polling status updates");
+            // Exercise the actual acquisition notification entry point with missing
+            // files so mode and history guards are checked without network/audio.
+            var previewFlag = typeof(FormMain).GetField("IsDesignPreview", BindingFlags.NonPublic | BindingFlags.Instance);
+            var notify = typeof(FormMain).GetMethod("NotifyNewResponses", BindingFlags.NonPublic | BindingFlags.Instance);
+            var status = (ToolStripStatusLabel)Field(form,"toolStripStatusLabelCommunication");
+            previewFlag.SetValue(form,false);
+            try
+            {
+                status.Text = "sentinel";
+                notify.Invoke(form,new object[] {false,0,60});
+                notify.Invoke(form,new object[] {true,60,60});
+                Check(status.Text == "sentinel", "initial history and unchanged updates never trigger notification");
+                notify.Invoke(form,new object[] {true,60,61});
+                Check(status.Text.Contains("有効な音声"), "new reply acquisition reaches sound notification independently of reading position");
+            }
+            finally { previewFlag.SetValue(form,true); }
+            modes.SelectedIndex = (int)AudioNotificationMode.Speech;
+            Check(FormMain.UserConfig.SpeakMode && !FormMain.UserConfig.PlaySoundNewResponse, "switching to speech disables notification sound");
+            modes.SelectedIndex = (int)AudioNotificationMode.Silent;
+            Check(!FormMain.UserConfig.SpeakMode && !FormMain.UserConfig.PlaySoundNewResponse, "silent mode disables both outputs");
+            using (var settings = new FormSettings())
+            {
+                settings.SetUserConfig(FormMain.UserConfig);
+                ((ComboBox)Field(settings,"audioModeSelector")).SelectedIndex = (int)AudioNotificationMode.Sound;
+                settings.GetUserConfig(FormMain.UserConfig);
+                Check(FormMain.UserConfig.AudioMode == AudioNotificationMode.Sound && !((Control)Field(settings,"checkBoxPlaySoundSync")).Visible, "settings use the same exclusive modes without speech synchronization");
+            }
             form.Width = 240;
             Application.DoEvents();
             Check(form.Width == 240, "reorganized toolbar still permits narrow window");
             form.Close();
         }
         Environment.SetEnvironmentVariable("SPEECHCAST_UI_PREVIEW", null);
+    }
+
+    static void SoundChecks()
+    {
+        string wave = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "notification-test.wav");
+        try
+        {
+            using (var w = new BinaryWriter(File.Create(wave)))
+            {
+                int rate = 16000, samples = rate / 4, bytes = samples * 2;
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF")); w.Write(36 + bytes);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt ")); w.Write(16);
+                w.Write((short)1); w.Write((short)1); w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data")); w.Write(bytes);
+                for (int i = 0; i < samples; i++) w.Write((short)(Math.Sin(i * Math.PI * 2 * 440 / rate) * 8000));
+            }
+            using (var player = new NotificationSoundPlayer())
+            {
+                int opened = 0, ended = 0, failures = 0;
+                string error = null;
+                player.Opened += delegate { opened++; };
+                player.Ended += delegate { ended++; };
+                player.Failed += message => { failures++; error = message; };
+                var watch = Stopwatch.StartNew();
+                Check(player.Play(wave, 0) && watch.ElapsedMilliseconds < 1000, "notification starts asynchronously without blocking the UI");
+                while (ended == 0 && failures == 0 && watch.ElapsedMilliseconds < 12000) { Application.DoEvents(); System.Threading.Thread.Sleep(10); }
+                Check(opened == 1 && ended == 1 && !player.IsBusy, "real WAV opens plays silently and releases player on completion: " + error);
+                Check(player.Play(wave, 0), "notification can replay after completion");
+                player.Stop();
+                Check(!player.IsBusy, "stopping during load cancels notification safely");
+                Check(!player.Play(wave + ".missing", 0) && failures == 1 && !player.IsBusy, "missing sound file reports failure without a wait loop");
+                File.WriteAllText(wave, "not an audio file");
+                watch.Restart();
+                player.Play(wave, 0);
+                while (failures < 2 && watch.ElapsedMilliseconds < 12000) { Application.DoEvents(); System.Threading.Thread.Sleep(10); }
+                Check(failures == 2 && !player.IsBusy, "invalid audio reports decoder failure and releases the player");
+            }
+        }
+        finally { File.Delete(wave); }
     }
 
     static void BrowserChecks(string sample)

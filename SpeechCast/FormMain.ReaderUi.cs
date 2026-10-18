@@ -56,14 +56,12 @@ namespace SpeechCastMe
 
             SetEmojiButton(toolStripButtonCaption, "字", "テロップ表示 ON / OFF");
             SetEmojiButton(toolStripButtonShowCaptionImmediately, "瞬", "テロップを瞬間表示");
-            SetEmojiButton(toolStripButtonSpeech, "🔊", "読み上げ ON / OFF");
-            SetEmojiButton(toolStripButtonPlaySoundNewResponse, "♪", "新着音 ON / OFF");
-            SetEmojiButton(toolStripButtonClickSound, "↻", "リロード音 ON / OFF");
+            InitializeAudioUi();
             SetEmojiButton(toolStripButtonBorder, "▣", "テロップの位置調整枠");
             SetEmojiButton(toolStripButtonSettings, "⚙️", "設定");
             SetEmojiButton(toolStripButtonOpenResCaptionForm, "代", "代替字幕を開く");
             toolStripLabel3.Text = "音量";
-            toolStripLabel8.Text = "新着音量";
+            toolStripLabel8.Text = "着信音量";
             toolStripComboBoxSelectVoice.Width = 132;
             toolStripTrackBarVoiceVolume.Width = 80;
             toolStripTrackBarPlayVolume.Width = 65;
@@ -179,6 +177,7 @@ namespace SpeechCastMe
 
         private void FinishReaderUi()
         {
+            SyncAudioModeUi();
             splitContainer1.Panel1Collapsed = true;
             splitContainerResCaption.Panel2Collapsed = true;
             // Font size now uses native pixels; old fractional CSS zoom blurred small glyphs.

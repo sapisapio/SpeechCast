@@ -7,6 +7,8 @@ using System.Text.RegularExpressions;
 
 namespace SpeechCastMe
 {
+    public enum AudioNotificationMode { Speech, Sound, Silent }
+
     public class UserConfig
     {
         // UI refresh preferences, 2026-10-18.
@@ -87,6 +89,10 @@ namespace SpeechCastMe
         /// </summary>
         public void SupplementSettings()
         {
+            AudioMode = AudioMode; // Normalize legacy simultaneous speech/sound flags.
+            NavigationSound = false;
+            PlaySoundNewResponseSync = false;
+            PlaySoundNewResevery = false;
             if (string.IsNullOrEmpty(this.EditorFilePath))
             {
                 string editorFilePath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"..\notepad.exe");
@@ -166,10 +172,21 @@ namespace SpeechCastMe
         /// </summary>
         public bool SpeakMode = false;
 
+        [System.Xml.Serialization.XmlIgnore]
+        public AudioNotificationMode AudioMode
+        {
+            get { return SpeakMode ? AudioNotificationMode.Speech : PlaySoundNewResponse ? AudioNotificationMode.Sound : AudioNotificationMode.Silent; }
+            set
+            {
+                SpeakMode = value == AudioNotificationMode.Speech;
+                PlaySoundNewResponse = value == AudioNotificationMode.Sound;
+            }
+        }
+
         /// <summary>
         /// リロード音ONOFF
         /// </summary>
-        public bool NavigationSound = true;
+        public bool NavigationSound = false;
         
         /// <summary>
         /// 読み上げ間隔
