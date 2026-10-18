@@ -17,7 +17,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
-namespace SpeechCast
+
+namespace SpeechCastMe
 {
     public partial class FormMain : Form
     {
@@ -47,6 +48,7 @@ namespace SpeechCast
 
             // コンポーネントの初期化
             InitializeComponent();
+            InitializeReaderUi();
 
             // インストール済みSSAPI5のボイスリストを取得
             foreach (InstalledVoice voice in synthesizer.GetInstalledVoices())
@@ -67,7 +69,7 @@ namespace SpeechCast
             this.webBrowser.StatusTextChanged += new EventHandler(webBrowser_StatusTextChanged);
             this.webBrowser.Navigating += new WebBrowserNavigatingEventHandler(webBrowser_Navigating);
             // JavaScriptでの差分取得用HTMLをセット
-            string html = Properties.Resources.resView.ToString();
+            string html = SpeechCastMe.Properties.Resources.resView.ToString();
             webBrowser.DocumentText = html;
         }
 
@@ -88,13 +90,15 @@ namespace SpeechCast
                     webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(resNo));
                 }
             }
-            else if (diffurl.EndsWith("jpg") || diffurl.EndsWith("png") || diffurl.EndsWith("gif") || diffurl.EndsWith("jpeg") || diffurl.EndsWith("bmp"))
+            // ミミックかってに改造 内蔵ビューアを使用しないように条件偽装（ごめんなさい）
+            else if (diffurl.EndsWith("tsukawanai") )
             {
                 e.Cancel = true;
                 oepnFormViewNewtabImg(url);
             }
-            else if (url.IndexOf("youtube.com/watch?v=")>0)
+            else if (url.IndexOf("tsukawanai.com/watch?v=")>0)
             {
+            // ミミックかってに改造 ここまで
                 e.Cancel = true;
                 Match m = youtubeId.Match(url);
                 if(m.Success){
@@ -102,7 +106,7 @@ namespace SpeechCast
                     oepnFormViewNewtabYoutube(id);
                 }
             }
-            else if (diffurl.StartsWith("http:"))
+            else if ((diffurl.StartsWith("http:") || diffurl.StartsWith("https:")))
             {
                 System.Diagnostics.Process.Start(url);
                 e.Cancel = true;
@@ -112,6 +116,7 @@ namespace SpeechCast
 
         static public FormMain Instance;
         private string captionTextBuffer = "";
+
         // 代替テキスト
         public string CaptionTextBuffer{
             // 数値と時計の自動変換
@@ -134,11 +139,12 @@ namespace SpeechCast
                 }
             }
         }
+        private bool WarningNextThread = false;
         // 読み上げ完了時の処理
         void synthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e)
         {
             speakingCompletedTime = System.DateTime.Now;
-            isSpeaking = false;
+            isSpeaking = false;           
 
             if (e.Cancelled)
             {
@@ -158,56 +164,77 @@ namespace SpeechCast
                 {
                     CurrentResNumber = CurrentResNumber;
                 }
+                //ミミック勝手に改造　レス数警告の判定処理を読み上げ完了時の処理に行う
+                else if (CurrentResNumber == UserConfig.endThreadWarningResCount)
+                {
+                    isSpeaking = true;
+                        if (isSpeaking)
+                        {
+                            this.speakendThreadWarning();
+                            WarningNextThread = true;
+                            CurrentResNumber++;
+                        }
+                }
                 else if (
                         CurrentResNumber <= Response.MaxResponseCount
-                    &&  (speakClipboard == false && endThreadWarning == false))
-                {
-                    CurrentResNumber++;
-                }
+                    && (speakClipboard == false && endThreadWarning == false))
+                     {                       
+                        CurrentResNumber++;
+                        if(WarningNextThread)
+                        {
+                            CurrentResNumber--;
+                            WarningNextThread = false;
+                        }
+
+                     }
+                //ミミック勝手に改造　ここまで
             }
         }
 
         System.DateTime speakingCompletedTime;
         System.DateTime gettingWebTime;
 
-
+        
         void synthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
         {
-            string speackStr;
+            
+                string speackStr;
 
-            if (!UserConfig.ShowCaptionImmediately && !FormCaption.Instance.IsAAMode)
-            {
-                int index = e.CharacterPosition + e.CharacterCount;
-
-                if (replacementIndices != null)
+                if (!UserConfig.ShowCaptionImmediately && !FormCaption.Instance.IsAAMode)
                 {
-                    if (index > 0)
+                    int index = e.CharacterPosition + e.CharacterCount;
+
+                    if (replacementIndices != null)
                     {
-                        index--;
+                        if (index > 0)
+                        {
+                            index--;
+                        }
+
+                        if (index < replacementIndices.Count)
+                        {
+                            index = replacementIndices[index] + 1;
+                        }
+                        else
+                        {
+                            index = speakingText.Length;
+                        }
                     }
 
-                    if (index < replacementIndices.Count)
-                    {
-                        index = replacementIndices[index] + 1;
-                    }
-                    else
+                    if (index > speakingText.Length)
                     {
                         index = speakingText.Length;
                     }
+                    speackStr = speakingText.Substring(0, index);
                 }
-
-                if (index > speakingText.Length)
+                else
                 {
-                    index = speakingText.Length;
+                    speackStr = speakingText;
                 }
-                speackStr = speakingText.Substring(0, index);
-            }
-            else
-            {
-                speackStr = speakingText;
-            }
-
+         
             FormCaption.Instance.CaptionText = speackStr;
+
+
         }
 
         public SpeechSynthesizer synthesizer = new SpeechSynthesizer();
@@ -254,13 +281,12 @@ namespace SpeechCast
             }
             try
             {
-                await GetFromURL(false);
+                CompleteThreadLoad(await GetFromURL(false));
             }
             catch (Exception ex)
             {
                 AddLog("Exception: {0}", ex.Message);
             }
-            AutoUpdate = false;
         }
 
         private async Task GetFromURLNext()
@@ -295,9 +321,12 @@ namespace SpeechCast
         }
 
 
-        Regex jbbsBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://(jbbs.livedoor.jp|jbbs.shitaraba.net)/\w+/\d+/)");
+        Regex jbbsBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://jbbs.livedoor.jp|http://jbbs.shitaraba.net/\w+/\d+/|https://jbbs.shitaraba.net/\w+/\d+/)");
         Regex nichanBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://.+2ch\.net/\w+/)\s*$");
         Regex yyBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://(yy.+\.60\.kg|yy.+\.kakiko\.com|bbs\.aristocratism\.info|www.+\.atchs\.jp)/\w+/$)");
+        // ミミックかってに改造 外部掲示板対応追加
+        Regex zerochanBaseRegex = new System.Text.RegularExpressions.Regex(@"((http://(?!jbbs).+|https://(?!jbbs).+)/\w+/)\s*$");
+        // ミミックかってに改造
 
         private bool CheckBaseURL()
         {
@@ -326,6 +355,34 @@ namespace SpeechCast
                         baseURL = m.Groups[1].Value;
                         Response.Style = Response.BBSStyle.yykakiko;
                         return true;
+                    }
+                    else
+                    {
+                        m = Communicator.zerochanRegex.Match(toolStripTextBoxURL.Text);
+                        if (m.Success)
+                        {
+                            rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
+                            threadId = m.Groups[3].Value;
+                            Response.Style = Response.BBSStyle.zerochan;
+
+                            AddLog("2ch dat mode: {0} {1}", rawURL, threadId);
+
+                            encodingName = "Shift_JIS";
+                            baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
+#if DEBUG
+                            debugDatFileName = m.Groups[3].Value + ".dat";
+#endif
+                        }
+                        else
+                        {
+                            m = zerochanBaseRegex.Match(toolStripTextBoxURL.Text);
+                            if (m.Success)
+                            {
+                                baseURL = m.Groups[1].Value;
+                                Response.Style = Response.BBSStyle.zerochan;
+                                return true;
+                            }
+                        }
                     }
                 }
             }
@@ -366,7 +423,13 @@ namespace SpeechCast
                         clearItems = false;
                         useRangeHeader = true;
                         break;
-
+                    // ミミックかってに改造 ぜろちゃんねる対応追加
+                    case Response.BBSStyle.zerochan:
+                        url = rawURL;
+                        clearItems = false;
+                        useRangeHeader = true;
+                        break;
+                        // ミミックかってに改造 ここまで
                 }
             }
             else
@@ -416,6 +479,27 @@ namespace SpeechCast
                             debugDatFileName = m.Groups[3].Value + ".dat";
 #endif
                         }
+                        // ミミックかってに改造 ぜろちゃんねる対応追加
+                        else
+                        {
+                            m = Communicator.zerochanRegex.Match(toolStripTextBoxURL.Text);
+                            if (m.Success)
+                            {
+                                rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
+                                threadId = m.Groups[3].Value;
+                                Response.Style = Response.BBSStyle.zerochan;
+
+                                AddLog("2ch dat mode: {0} {1}", rawURL, threadId);
+
+                                encodingName = "Shift_JIS";
+                                baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
+#if DEBUG
+                                debugDatFileName = m.Groups[3].Value + ".dat";
+#endif
+                            }
+                        }
+                        // ミミックかってに改造 ここまで
+
                     }
                 }
 
@@ -443,8 +527,9 @@ namespace SpeechCast
             // 完全にバックグラウンド処理になったので、メッセージなどはコメントアウト
             //communicationStatusString = "通信中・・・・";
             //PushAndSetWaitCursor();
+            //　ミミック修正　使われてない変数を削除
             int oldResponseCount = responses.Count;
-            long responseTime = 0, readTime = 0, listViewTime = 0, documetnTime = 0, encodingTime = 0, setTime = 0;
+            long responseTime = 0, readTime = 0, listViewTime = 0, encodingTime = 0, setTime = 0;
             System.Net.HttpWebResponse webRes = null;
             // タイムアウト等の結果判別用真偽値
             bool webReqResult = true;
@@ -573,9 +658,38 @@ namespace SpeechCast
 
                                 memStream.Seek(0, SeekOrigin.Begin);
                             }
-#endif
+                        // ミミックかってに改造 ぜろちゃんねる対応追加
+                        if (Response.Style == Response.BBSStyle.zerochan && string.IsNullOrEmpty(debugDatFileName) == false && memStream.Length > 1)
+                        {
+                            memStream.ReadByte();
 
-                            if (useRangeHeader && memStream.Length > 0)
+                            string datDirName = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "Logs");
+
+                            if (!Directory.Exists(datDirName))
+                            {
+                                Directory.CreateDirectory(datDirName);
+                            }
+                            string fullPath = Path.Combine(datDirName, debugDatFileName);
+                            FileMode fileMode = FileMode.Create;
+
+                            if (File.Exists(fullPath) && next)
+                            {
+                                fileMode = FileMode.Append;
+                            }
+
+                            using (FileStream fs = new FileStream(fullPath, fileMode))
+                            {
+                                Byte[] bytes = new Byte[memStream.Length - 1];
+                                memStream.Read(bytes, 0, (int)memStream.Length - 1);
+                                fs.Write(bytes, 0, bytes.Length);
+                            }
+
+                            memStream.Seek(0, SeekOrigin.Begin);
+                        }
+#endif
+                        // ミミックかってに改造 ここまで
+
+                        if (useRangeHeader && memStream.Length > 0)
                             {
                                 int c = memStream.GetBuffer()[0];
 
@@ -716,7 +830,7 @@ namespace SpeechCast
                 if (responses.Count != 0)
                 {
                     threadTitle = responses[0].ThreadTitle;
-                    this.Text = string.Format("SpeechCast - {0}", threadTitle);
+                    this.Text = string.Format("Speech Cast SP — {0}", threadTitle);
                 }
 
                 if (updated)
@@ -734,7 +848,7 @@ namespace SpeechCast
                         }
                         if (moveScrollBottom)
                         {
-                            webBrowser.Document.Window.ScrollTo(0, webBrowser.Document.Body.ScrollRectangle.Height);
+                            webBrowser.Document.InvokeScript("scrollBottom");
                             moveScrollBottom = false;
                         }
                     }                    
@@ -773,6 +887,8 @@ namespace SpeechCast
 
         public SoundPlayer soundPlayerNewResponse = null;
 
+
+
         private void PlaySoundNewResponse()
         {
             if (UserConfig.NewResponseSoundFilePathes.Count > 0 && UserConfig.PlaySoundNewResponse)
@@ -784,47 +900,44 @@ namespace SpeechCast
                 //System.Console.WriteLine(soundIdx);
                 if (File.Exists(NewResponseSoundFilePath))
                 {
+
+
                     try
                     {
                         //MP3対応したかったが、同期再生が出来ずに挫折。誰か実装してくれ
-                        //WMPLib.WindowsMediaPlayer mp = new WMPLib.WindowsMediaPlayer(); /* WMP */
-                        //mp.URL = NewResponseSoundFilePath; /* 再生したい音声ファイルのパス */
-                        //mp.settings.volume = UserConfig.PlayVolume;
-                        //if (UserConfig.PlaySoundNewResponseSync)
-                        //{
-                        //    mp.controls.play();
-                        //    while((int)mp.playState == 1) /* 停止しているか判定 */
-                        //    {
-                        //        System.Threading.Thread.Sleep(1000);
-                        //    }
-                        //    mp.close();　/* 音声ファイルを切り替える前に使うといいらしい */
-                        //}
-                        //else
-                        //{
-                        //    mp.controls.play();
-                        //}
-                        if (soundPlayerNewResponse == null)
+                        //ミミック勝手に改造　↑との事でMP3対応＆同期再生実装
+                        System.Windows.Media.MediaPlayer newplaysound;
+                        newplaysound = new System.Windows.Media.MediaPlayer();
+                        newplaysound.Open(new System.Uri(NewResponseSoundFilePath));
+
+                        while(!newplaysound.NaturalDuration.HasTimeSpan)//音声ファイルを読み込むまで待ってあげる
                         {
-                            soundPlayerNewResponse = new SoundPlayer();
+                            async void loadwait()
+                            {
+                                await Task.Delay(1);
+                            }
+                            loadwait();
                         }
-                        soundPlayerNewResponse.SoundLocation = NewResponseSoundFilePath;
-                        soundPlayerNewResponse.Load();
+
+                        int mediaduration = (int)newplaysound.NaturalDuration.TimeSpan.TotalMilliseconds +1;
+                        newplaysound.Volume = UserConfig.PlayVolume * 0.01;
 
                         if (UserConfig.PlaySoundNewResponseSync)
                         {
-                            soundPlayerNewResponse.PlaySync();
+                            newplaysound.Play();
+                            Thread.Sleep(mediaduration);
                         }
                         else
                         {
-                            soundPlayerNewResponse.Play();
+                            newplaysound.Play();
                         }
-                        soundPlayerNewResponse.Dispose();
-
+                        //ミミック勝手に改造　ここまで
                     }
                     catch (Exception ex)
                     {
                         AddLog("PlaySoundNewResponse:{0}", ex.Message);
                     }
+
                 }
             }
 
@@ -832,31 +945,12 @@ namespace SpeechCast
 
         private int GetResponsesScrollY(int no)
         {
-            int scrollY = 0;
-
-            if (no >= 1 && no <= responses.Count)
-            {
-                if (responses[no - 1].ScrollY < 0)
-                {
-                    string name = string.Format("res{0}", no);
-
-                    foreach (HtmlElement elem in webBrowser.Document.GetElementsByTagName("a"))
-                    {
-                        if (name == elem.Name)
-                        {
-                            scrollY = elem.OffsetRectangle.Y;
-                            responses[no - 1].ScrollY = scrollY;
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    scrollY = responses[no - 1].ScrollY;
-                }
-            }
-            return scrollY;
+            // 2026-10-18: resolve document coordinates after template/width changes.
+            if (webBrowser.Document == null) return 0;
+            object top = webBrowser.Document.InvokeScript("getResTop", new object[] { no });
+            return top == null ? 0 : Convert.ToInt32(top);
         }
+
 
         private void webBrowser_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
@@ -866,6 +960,7 @@ namespace SpeechCast
         private int currentResNumber_ = 0;
         private int NewResponseNumber = 0;
 
+        static bool listviewdc = false;
         public int CurrentResNumber
         {
             get
@@ -887,32 +982,30 @@ namespace SpeechCast
 
             set
             {
-                if (toolStripButtonAutoUpdate.Checked != value)
+                bool changed = toolStripButtonAutoUpdate.Checked != value;
+                toolStripButtonAutoUpdate.Checked = value;
+                if (value)
                 {
-
-                    toolStripButtonAutoUpdate.Checked = value;
-
-                    if (value)
+                    ScrollToDocumentEnd();
+                    if (changed)
                     {
-                        Response res = GetSelectedResonse();
-
-                        if (res != null)
-                        {
-                            CurrentResNumber = res.Number;
-                        }
-                        else
-                        {
-                            CurrentResNumber = responses.Count + 1;
-                        }
+                        Response selected = GetSelectedResonse();
+                        CurrentResNumber = selected != null ? selected.Number : responses.Count + 1;
                         captionTextBuffer = textBoxDefaultCaption.Text;
-                        StartSpeaking();
-                    }
-                    else
-                    {
-                        communicationStatusString = "";
+                        if (!IsDesignPreview) StartSpeakingAsync();
                     }
                 }
+                else communicationStatusString = "";
             }
+        }
+
+        private void CompleteThreadLoad(bool success)
+        {
+            if (!success) return;
+            // Initial loads start at the newest response, never replaying the backlog.
+            foreach (ListViewItem item in listViewResponses.SelectedItems) item.Selected = false;
+            if (listViewResponses.Items.Count > 0) listViewResponses.Items[listViewResponses.Items.Count - 1].Selected = true;
+            AutoUpdate = true;
         }
 
         private bool timerTickEnabled
@@ -939,14 +1032,14 @@ namespace SpeechCast
             StopSpeaking();
 
             CurrentResNumber = resNumber;
-            StartSpeaking();
+            StartSpeakingAsync();
         }
         int fileNameIndex = 0;
 
         private bool isSpeaking = false;
         private string speakingText = "";
         private bool isSpeakingWarningMessage = false;
-        private void StartSpeaking()
+        private async Task StartSpeakingAsync()
         {
             speakClipboard = false;
 
@@ -972,13 +1065,90 @@ namespace SpeechCast
 
                 isSpeakingWarningMessage = false;
                 isSpeaking = true;
+                if (CurrentResNumber == NewResponseNumber)
+                {
+                    //ミミック勝手に改造　レス毎に効果音鳴らす用に追加
+                    if (UserConfig.PlaySoundNewResevery == true)
+                    {
+
+                        if (FormMain.listviewdc == false)
+                        {
+                            PlaySoundNewResponse();
+                            NewResponseNumber = NewResponseNumber + 1;
+                            
+                        }
+                        else
+                        {
+                            FormMain.listviewdc = false;
+                        }
+
+                    }
+                    else
+                    {
+
+                    }
+                    //ミミック勝手に改造　ここまで
+                }
+                else
+                {
+                }
                 StartSpeaking(text);
                 //コマンドライン引渡し
                 //ターゲット指定が空でなければ実行
+                // ミミックかってに改造 テスト実装でそのままだった変数への代入がきちんと行われるように追加
                 if (UserConfig.CommandLineTargetPath != "")
                 {
-                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, @UserConfig.CommandLineParam);
+                  if (pronounciationText2.Length >= UserConfig.AAModeTextLength)
+                    {
+                        String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
+                        LogText2 = LogText2.Replace("#Name#", res.Name);
+                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#Time#", res.DateTime);
+                        LogText2 = LogText2.Replace(" ", "。");
+                        if (LogText2.Contains("/Talk"))
+                        {
+                            LogText2 = LogText2.Replace("/Talk", "");
+                            LogText2 = "/Talk " + LogText2;
+                        }
+                        else
+                        {
+
+                        }
+                            System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                    }
+                    else if (UserConfig.IncludeAAConditionText(text))
+                    {
+                        String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
+                        LogText2 = LogText2.Replace("#Name#", res.Name);
+                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#Time#", res.DateTime);
+                        LogText2 = LogText2.Replace(" ", "。");
+                        if (LogText2.Contains("/Talk"))
+                        {
+                            LogText2 = LogText2.Replace("/Talk", "");
+                            LogText2 = "/Talk " + LogText2;
+                        }
+                        else
+                        {
+
+                        }
+                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                    }
+                    else
+                    {
+                        String LogText = UserConfig.CommandLineParam.Replace("#Res#" ,res.Text);
+                        LogText = LogText.Replace("#Name#" ,res.Name);
+                        LogText = LogText.Replace("#No#" ,res.Number.ToString());
+                        LogText = LogText.Replace("#Time#" ,res.DateTime);
+                        LogText = LogText.Replace("\n", "");
+                        LogText = LogText.Replace(" ", "。");
+                        LogText = LogText.Replace("/Talk", "/Talk ");
+                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+                    }
+                    
+
                 }
+                // ミミックかってに改造 ここまで
 
                 //レスの出力処理とクリップボードコピー
                 if (UserConfig.OutputLog || UserConfig.CopyLog)
@@ -1053,9 +1223,13 @@ namespace SpeechCast
                                 LogText = LogText.Replace("#No#", res.Number.ToString());
                                 LogText = LogText.Replace("#Time#", res.DateTime);
                                 writer.WriteLine(LogText);
+                                
+
                             }
                             System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+                            
                             fileNameIndex++;
+
                         }
                     }
                 } 
@@ -1064,8 +1238,56 @@ namespace SpeechCast
             }
             else if (openNextThread == OpenNextThread)
             {
+
                 openNextThread = SpeakAnnounce;
                 speakingText = string.Format("次スレ候補、{0}を開きます。", threadTitle);
+                //ミミック勝手に改造 1000スレ到達&次スレ移行もコマンドラインとテキスト出力へ送信
+                if (UserConfig.CommandLineTargetPath != "")
+                {
+                    String Logtext = string.Format("次スレ候補、{0}を開きます。", threadTitle);
+                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, Logtext);
+                }
+                //レスの出力処理とクリップボードコピー
+                if (UserConfig.OutputLog || UserConfig.CopyLog)
+                {
+                    //クリップボード周り
+                    if (UserConfig.CopyLog)
+                    {
+                        String LogText = string.Format("次スレ候補、{0}を開きます。", threadTitle);
+                        Clipboard.SetDataObject(LogText, true);
+                    }
+                    //レス出力周り
+                    if (UserConfig.OutputLog)
+                    {
+                        var OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                        if (UserConfig.LogEncode == 0)
+                        {
+                            OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                        }
+                        else if (UserConfig.LogEncode == 1)
+                        {
+                            OutputEncoding = Encoding.GetEncoding("EUC-JP");
+                        }
+                        else
+                        {
+                            OutputEncoding = new System.Text.UTF8Encoding(false);
+                        }
+                        //もし改行分割なら配列に入れる
+                        ArrayList ResArray = new ArrayList();
+                        //それを配列の数だけループ
+                        //using (var writer = new StreamWriter(UserConfig.OutputLogPath.Replace(".", fileNameIndex.ToString() + "."), UserConfig.LogAppendMode, OutputEncoding))
+                        using (var writer = new StreamWriter(UserConfig.OutputLogPath, UserConfig.LogAppendMode, OutputEncoding))
+                        {
+                            var LogText = string.Format("次スレ候補、{0}を開きます。", threadTitle);
+                            writer.WriteLine(LogText);
+
+
+                        }
+                        System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+
+                        fileNameIndex++;
+                    }
+                }
 
                 replacementIndices = null;
                 isSpeakingWarningMessage = true;
@@ -1073,17 +1295,73 @@ namespace SpeechCast
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
                 synthesizer.SpeakAsync(speakingText);
+
+
             }
             else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread)
             {
+
                 speakingText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                //ミミック勝手に改造 1000スレ到達&次スレ移行もコマンドラインとテキスト出力へ送信
+                //if (UserConfig.CommandLineTargetPath != "")
+                //{
+                   // String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                    //System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, fuckyou);
+                //}
+                //レスの出力処理とクリップボードコピー
+                if (UserConfig.OutputLog || UserConfig.CopyLog)
+                {
+                    //クリップボード周り
+                    if (UserConfig.CopyLog)
+                    {
+                        String LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                        Clipboard.SetDataObject(LogText, true);
+                    }
+                    //レス出力周り
+                    if (UserConfig.OutputLog)
+                    {
+                        var OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                        if (UserConfig.LogEncode == 0)
+                        {
+                            OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                        }
+                        else if (UserConfig.LogEncode == 1)
+                        {
+                            OutputEncoding = Encoding.GetEncoding("EUC-JP");
+                        }
+                        else
+                        {
+                            OutputEncoding = new System.Text.UTF8Encoding(false);
+                        }
+                        //もし改行分割なら配列に入れる
+                        ArrayList ResArray = new ArrayList();
+                        //それを配列の数だけループ
+                        //using (var writer = new StreamWriter(UserConfig.OutputLogPath.Replace(".", fileNameIndex.ToString() + "."), UserConfig.LogAppendMode, OutputEncoding))
+                        using (var writer = new StreamWriter(UserConfig.OutputLogPath, UserConfig.LogAppendMode, OutputEncoding))
+                        {
+                            var LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                            writer.WriteLine(LogText);
+
+
+                        }
+                        System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+
+                        fileNameIndex++;
+                    }
+                }
 
                 replacementIndices = null;
                 isSpeakingWarningMessage = true;
                 FormCaption.Instance.IsAAMode = false;
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
+                if (UserConfig.CommandLineTargetPath != "")
+                {
+                    String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, fuckyou);
+                }
                 synthesizer.SpeakAsync(speakingText);
+
             }
             else
             {
@@ -1091,9 +1369,8 @@ namespace SpeechCast
                 isSpeaking = false;
             }
         }
-
+        //ミミック勝手に改造 ここまで
         bool speakClipboard = false;
-
         public const string LONG_SENTENCE_STRING = "\n(長文のため以下省略)";
 
         public static Regex RegexBetweenBraces = new Regex("「(.+?)」", RegexOptions.None);
@@ -1104,19 +1381,19 @@ namespace SpeechCast
             bool isAAMode = false;
 
             pronounciationText = UserConfig.ReplacePronouncationWords(text, out replacementIndices);
-
             if (!isSpeakingWarningMessage)
             {
                 if (pronounciationText.Length >= UserConfig.AAModeTextLength)
                 {
                     isAAMode = true;
+                    
                 }
                 else if (UserConfig.IncludeAAConditionText(text))
                 {
                     isAAMode = true;
                 }
             }
-
+            pronounciationText2 = pronounciationText;
             if (isAAMode)
             {
                 //AAモード
@@ -1170,7 +1447,6 @@ namespace SpeechCast
                     }
                 }
             }
-
             FormCaption.Instance.IsAAMode = isAAMode;
             FormCaption.Instance.CaptionText = "";
             if ((responses.Count - CurrentResNumber) < UserConfig.TurboThreshold || UserConfig.TurboMode == false)
@@ -1184,10 +1460,36 @@ namespace SpeechCast
             if (UserConfig.SpeakMode)
             {
                 synthesizer.Volume = UserConfig.SpeakingVolume;
-            }else{
+            }
+            else
+            {
                 synthesizer.Volume = 0;
             }
-            if (CurrentResNumber == NewResponseNumber) PlaySoundNewResponse();
+            if (CurrentResNumber == NewResponseNumber)
+            {
+                //ミミック勝手に改造　新着レス毎に効果音を鳴らさない方の調整
+                if (UserConfig.PlaySoundNewResevery == false)
+                {
+                    if (FormMain.listviewdc == false)
+                    {
+                        PlaySoundNewResponse();
+                        NewResponseNumber = NewResponseNumber + 1;
+                        FormMain.listviewdc = true;
+                    }
+                    else
+                    {
+                        FormMain.listviewdc = false;
+                    }
+                }
+                else
+                {
+
+
+
+                }
+                //ミミック勝手に改造　ここまで
+
+            }
             synthesizer.SpeakAsync(MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(pronounciationText));
         }
 
@@ -1238,14 +1540,14 @@ namespace SpeechCast
         private void listViewResponses_DoubleClick(object sender, EventArgs e)
         {
             Response res = GetSelectedResonse();
-
             if (res != null)
             {
                 CurrentResNumber = res.Number;
 
+
                 if (synthesizer.State == SynthesizerState.Ready)
                 {
-                    StartSpeaking();
+                    StartSpeakingAsync();
                 }
             }
         }
@@ -1270,13 +1572,14 @@ namespace SpeechCast
         private const int OpenNextThread = 1;
         // 次スレへ移動中(移動中アナウンス管理用)
         private const int SpeakAnnounce = 2;
-        private bool endThreadAlertFlg = false;
+        // ミミック勝手に改造　使われてない変数を無効に
+        //private bool endThreadAlertFlg = false;
         private TimeSpan diff;
         private TimeSpan diffWeb;
         // 読み上げ管理用バックグラウンドプロセス
         private void timer_Tick(object sender, EventArgs e)
         {
-            if (UserConfig.EnableAutoScroll) webBrowser.Document.Window.ScrollTo(0, (webBrowser.Document.Body.ScrollTop + UserConfig.AutoScrollSpeed));
+            if (UserConfig.EnableAutoScroll) webBrowser.Document.InvokeScript("scrollByY", new object[] { UserConfig.AutoScrollSpeed });
             diff = System.DateTime.Now - speakingCompletedTime;
             diffWeb = System.DateTime.Now - gettingWebTime;
             if (CurrentResNumber != UserConfig.endThreadWarningResCount) endThreadWarning = false;
@@ -1299,6 +1602,23 @@ namespace SpeechCast
                 { 
                     objDate = System.DateTime.Now;
                     FormCaption.Instance.CaptionText = CaptionTextBuffer;
+                    // ミミックかってに改造　テキスト出力した物を消す←ファイルごとじゃなくて内容のみ消去に変更
+                    if (System.IO.File.Exists(UserConfig.OutputLogPath))
+                    {
+                        Encoding enc = Encoding.GetEncoding("UTF-8");
+                        using (var writer = new StreamWriter(UserConfig.OutputLogPath, UserConfig.LogAppendMode, enc))
+                        {
+                            var LogText = "";
+                            writer.WriteLine(LogText);
+
+                        }
+                        System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+
+                        fileNameIndex++;
+
+                    }
+
+                    // ミミックかってに改造　ここまで
                 }
                 // 自動更新がONならば
                 if (AutoUpdate)
@@ -1386,30 +1706,99 @@ namespace SpeechCast
                     //&& responses.Count >= CurrentResNumber
                     )
                 {
-                    StartSpeaking();
-                    if (CurrentResNumber == UserConfig.endThreadWarningResCount && !endThreadWarning)
-                    {
-                        endThreadWarning = true;
-                        while (isSpeaking) ;
-                        this.speakendThreadWarning();
-                    }
+                    StartSpeakingAsync();
+
+                //ミミック勝手に改造　スレ立て警告条件の分岐を読み子終了判定部へ変更
+                   //if (WarningNextThread)
+                   // {
+                   //     if (!endThreadWarning)
+                   //     {
+                   //         endThreadWarning = true;
+                   //         while(isSpeaking)
+                   //         {
+                   //             this.speakendThreadWarning();                            
+                   //         }
+                   //     
+                   //     }         
+                   // }
+                  //ミミック勝手に改造此処まで
                 }
                 if (endThreadWarning)
                 {
                     speakingInvervalMillsec = 40 * 1000;
                     if (diff.TotalMilliseconds >= speakingInvervalMillsec) { 
                         this.speakendThreadWarning();
+                        
                     }
                 }
             }
         }
         private void speakendThreadWarning()
         {
-            string speakText = string.Format("レスが{0}に到達しました。次スレを準備してください。", CurrentResNumber - 1);
+            string speakText = string.Format("レスが{0}に到達しました。次スレを準備してください。\n", CurrentResNumber);
             endThreadWarning = true;
             isSpeakingWarningMessage = false;
             isSpeaking = true;
+
+
+
+            //ミミック勝手に改造　警告文字列もコマンドラインとテキスト出力へ送信
+
+
+
+            if (UserConfig.CommandLineTargetPath != "")
+            {
+             String LogText = string.Format("レスが{0}に到達しました。次スレを準備してください。", CurrentResNumber);
+             System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+            }
+            //レスの出力処理とクリップボードコピー
+            if (UserConfig.OutputLog || UserConfig.CopyLog)
+            {
+                //クリップボード周り
+                if (UserConfig.CopyLog)
+                {
+                    String LogText = string.Format("レスが{0}に到達しました。次スレを準備してください。", CurrentResNumber);
+                    Clipboard.SetDataObject(LogText, true);
+                }
+                //レス出力周り
+                if (UserConfig.OutputLog)
+                {
+                    var OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                    if (UserConfig.LogEncode == 0)
+                    {
+                        OutputEncoding = Encoding.GetEncoding("Shift_JIS");
+                    }
+                    else if (UserConfig.LogEncode == 1)
+                    {
+                        OutputEncoding = Encoding.GetEncoding("EUC-JP");
+                    }
+                    else
+                    {
+                        OutputEncoding = new System.Text.UTF8Encoding(false);
+                    }
+                    //もし改行分割なら配列に入れる
+                    ArrayList ResArray = new ArrayList();
+                    //それを配列の数だけループ
+                        //using (var writer = new StreamWriter(UserConfig.OutputLogPath.Replace(".", fileNameIndex.ToString() + "."), UserConfig.LogAppendMode, OutputEncoding))
+                        using (var writer = new StreamWriter(UserConfig.OutputLogPath, UserConfig.LogAppendMode, OutputEncoding))
+                        {
+                            var LogText = string.Format("レスが{0}に到達しました。次スレを準備してください。", CurrentResNumber);                            
+                            writer.WriteLine(LogText);
+
+
+                        }
+                        System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+
+                        fileNameIndex++;
+                }
+            }
+
+
+            //　ミミック勝手に改造　ここまで
+
+
             StartSpeaking(speakText);
+
         }
 
 
@@ -1460,8 +1849,9 @@ namespace SpeechCast
 
         private void FormMain_Load(object sender, EventArgs e)
         {
-            string userConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"SpeechCast\Application.cfg");
-            string bookmarksConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"SpeechCast\Bookmarks.cfg");
+            if (IsDesignPreview) { LoadDesignPreview(); return; }
+            string userConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"SpeechCastMe\Application.cfg");
+            string bookmarksConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"SpeechCastMe\Bookmarks.cfg");
 
             if (File.Exists(userConfigPath))
             {
@@ -1509,6 +1899,9 @@ namespace SpeechCast
                     toolStripButtonAutoScroll.Checked = UserConfig.EnableAutoScroll;
                     toolStripButtonListToggle.Checked = !UserConfig.ViewResList;
                     toolStripTextBoxThreadKeyword.Text = UserConfig.ThreadKeyword;
+                    // ミミック勝手に改造 代替字幕の設定を保存
+                    textBoxDefaultCaption.Text = UserConfig.CaptionTextBuffer.Replace("\r\n", "\n").Replace("\n", "\r\n");
+                    // ミミック勝手に改造 ここまで
 
                     this.viewResList(UserConfig.ViewResList);
                 }
@@ -1558,6 +1951,7 @@ namespace SpeechCast
 
             selectedIndex = 0;
             toolStripTrackBarVoiceVolume.Value = UserConfig.SpeakingVolume;
+            toolStripTrackBarPlayVolume.Value = UserConfig.PlayVolume;
             synthesizer.Volume = UserConfig.SpeakingVolume;
             myToolStripPlay.GripStyle = ToolStripGripStyle.Hidden;
             myToolStripUrl.GripStyle = ToolStripGripStyle.Hidden;
@@ -1566,6 +1960,7 @@ namespace SpeechCast
 
             speakingCompletedTime = System.DateTime.Now;
             gettingWebTime = System.DateTime.Now;
+            FinishReaderUi();
             //idx = toolStripComboBoxVolume.Items.IndexOf(UserConfig.SpeakingVolume);
             //if (idx >= 0)
             //{
@@ -1580,6 +1975,13 @@ namespace SpeechCast
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (IsDesignPreview)
+            {
+                timer.Stop(); timerWeb.Stop();
+                FormCaption.Instance.Close();
+                synthesizer.Dispose();
+                return;
+            }
             this.WindowState = FormWindowState.Normal;
             UserConfig.SetFormToRect(ref UserConfig.FormMainRect, this);
             UserConfig.SetFormToRect(ref UserConfig.FormCaptionRect, FormCaption.Instance);
@@ -1667,7 +2069,7 @@ namespace SpeechCast
         {
             if (responses.Count > 0)
             {
-                webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(responses.Count));
+                webBrowser.Document.InvokeScript("scrollBottom");
             }
         }
 
@@ -1905,6 +2307,11 @@ namespace SpeechCast
                 toolStripTextBoxURL.Text = url;
                 GetFromURL();
             }
+            if (url.StartsWith("https://"))
+            {
+                toolStripTextBoxURL.Text = url;
+                GetFromURL();
+            }
         }
 
         private void toolStripTrackBarVoiceVolume_ValueChanged(object sender, EventArgs e)
@@ -1912,6 +2319,12 @@ namespace SpeechCast
             UserConfig.SpeakingVolume = toolStripTrackBarVoiceVolume.Value;
             toolStripTextBoxVoiceVolume.Text = toolStripTrackBarVoiceVolume.Value.ToString();
             synthesizer.Volume = toolStripTrackBarVoiceVolume.Value;            
+        }
+        private void toolStripTrackBarPlayVolume_ValueChanged(object sender, EventArgs e)
+
+        {
+            UserConfig.PlayVolume = toolStripTrackBarPlayVolume.Value;
+            toolStripTextBoxPlayVolume.Text = toolStripTrackBarPlayVolume.Value.ToString();
         }
 
         private void toolStripTextBoxVoiceVolume_TextChanged(object sender, EventArgs e)
@@ -1935,6 +2348,30 @@ namespace SpeechCast
                 else
                 {
                     toolStripTextBoxVoiceVolume.Text = toolStripTrackBarVoiceVolume.Value.ToString();
+                }
+            }
+        }
+
+        private void toolStripTextBoxPlayVolume_TextChanged(object sender, EventArgs e)
+        {
+            int vol;
+            if (toolStripTextBoxPlayVolume.Text.Length > 0)
+            {
+                if (int.TryParse(toolStripTextBoxPlayVolume.Text, out vol))
+                {
+                    if (vol <= 100 && vol > 0)
+                    {
+                       UserConfig.PlayVolume = vol;
+                        toolStripTrackBarPlayVolume.Value = vol;
+                    }
+                    else
+                    {
+                        toolStripTextBoxPlayVolume.Text = toolStripTrackBarPlayVolume.Value.ToString();
+                    }
+                }
+                else
+                {
+                    toolStripTextBoxPlayVolume.Text = toolStripTrackBarPlayVolume.Value.ToString();
                 }
             }
         }
@@ -1997,21 +2434,18 @@ namespace SpeechCast
                 ToolTip1.Hide(this);
             }
         }
-
+        // ミミックかってに改造 サポート連絡先の変更)
         private void toolStripMenuItemGoSupportBBS_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show("サポート掲示板に移動します。よろしいですか？", "警告", MessageBoxButtons.YesNo) == DialogResult.Yes)
-            {
-                toolStripTextBoxURL.Text = "http://bbs.aristocratism.info/slyman/";
-                GetFromURL();
-            }
+            
+            System.Diagnostics.Process.Start("http://jbbs.shitaraba.net/computer/43059/");
         }
 
         private void toolStripMenuItemGoLatestRelease_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("https://github.com/ggslyman/SpeechCast/releases/latest");
+            System.Diagnostics.Process.Start("https://twitter.com/s_mimic360");
         }
-
+        // ミミックかってに改造 ここまで
         private void toolStripButtonTurbo_Click(object sender, EventArgs e)
         {
             UserConfig.TurboMode = !UserConfig.TurboMode;
@@ -2045,6 +2479,7 @@ namespace SpeechCast
 
         private void openResCaptionForm()
         {
+            splitContainerResCaption.Panel2Collapsed = false;
             if (this.splitContainerResCaption.Panel2.Height > 0)
             {
                 int resCaptionFormHeight = this.splitContainerResCaption.SplitterDistance;
@@ -2057,7 +2492,7 @@ namespace SpeechCast
             {
                 this.splitContainerResCaption.SplitterDistance = this.splitContainerResCaption.Height - 130;
                 this.splitContainerResCaption.IsSplitterFixed = false;
-                webBrowser.Document.Window.ScrollTo(0, (webBrowser.Document.Body.ScrollTop + this.splitContainerResCaption.Panel2.Height));
+                webBrowser.Document.InvokeScript("scrollByY", new object[] { this.splitContainerResCaption.Panel2.Height });
                 this.toolStripButtonOpenResCaptionForm.Checked = true;
             }
         }
@@ -2124,6 +2559,11 @@ namespace SpeechCast
                         case Response.BBSStyle.nichan:
                             encodingName = "Shift_JIS";
                             break;
+                        // ミミックかってに改造 ぜろちゃんねる対応追加
+                        case Response.BBSStyle.zerochan:
+                            encodingName = "Shift_JIS";
+                            break;
+                            // ミミックかってに改造 ここまで
                     }
                     System.Net.HttpWebResponse webRes = null;
                     try
@@ -2183,7 +2623,7 @@ namespace SpeechCast
                             threadId = m3.Value;
                         }
                         // スレッドURLを生成
-                        string threadUrl = Communicator.Instance.getThreadUrl(baseURL, threadId);
+                        string threadUrl = Communicator.Instance.GetThreadUrl(baseURL, threadId);
                         if (threadUrl.Length > 0)
                         {
                             // スレッドURLを生成出来たら、URL入力テキストボックスにそのURLをセット、
@@ -2303,6 +2743,9 @@ namespace SpeechCast
         private void textBoxDefaultCaption_Changed(object sender, EventArgs e)
         {
             CaptionTextBuffer = textBoxDefaultCaption.Text;
+            // ミミック勝手に改造 代替字幕の設定を保存
+            UserConfig.CaptionTextBuffer = textBoxDefaultCaption.Text;
+            // ミミック勝手に改造 ここまで
         }
         public void insertTextBox(TextBox targetText, string msg)
         {
@@ -2337,6 +2780,8 @@ namespace SpeechCast
 
         // イメージビューア起動
         public FormViewResource formViewResource = null;
+        private string pronounciationText2;
+
         private void oepnFormViewNewtabImg(string url)
         {
             if ((formViewResource == null) || formViewResource.IsDisposed)
@@ -2400,23 +2845,19 @@ namespace SpeechCast
 
         private void toolStripButtonZoomOutnResView_Click(object sender, EventArgs e)
         {
-            Object[] objArray = new Object[1];
-            UserConfig.magnification = UserConfig.magnification - 0.1;
-            objArray[0] = UserConfig.magnification;
-            webBrowser.Document.InvokeScript("setZoom", objArray);
+            UserConfig.CommentFontSize = Math.Max(10, UserConfig.CommentFontSize - 1);
+            ApplyReaderAppearance();
         }
 
         private void toolStripButtonZoomInnResView_Click(object sender, EventArgs e)
         {
-            Object[] objArray = new Object[1];
-            UserConfig.magnification = UserConfig.magnification + 0.1;
-            objArray[0] = UserConfig.magnification;
-            webBrowser.Document.InvokeScript("setZoom", objArray);
+            UserConfig.CommentFontSize = Math.Min(40, UserConfig.CommentFontSize + 1);
+            ApplyReaderAppearance();
         }
 
         private void toolStripButtonMoveBottom_Click(object sender, EventArgs e)
         {
-            webBrowser.Document.Window.ScrollTo(0, webBrowser.Document.Body.ScrollRectangle.Height);
+            webBrowser.Document.InvokeScript("scrollBottom");
         }
 
         private void toolStripButtonOpenResCaptionForm_Click(object sender, EventArgs e)
@@ -2424,5 +2865,19 @@ namespace SpeechCast
             this.openResCaptionForm();
         }
 
+        private void webBrowser_DocumentCompleted_1(object sender, WebBrowserDocumentCompletedEventArgs e)
+        {
+
+        }
+
+        private void myToolStripBrowser_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
+        {
+
+        }
+
+        private void toolStripLabel8_Click(object sender, EventArgs e)
+        {
+
+        }
     }
 }

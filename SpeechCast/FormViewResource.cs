@@ -10,7 +10,7 @@ using System.Windows.Forms;
 using System.Net;
 using System.IO;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     public partial class FormViewResource : Form
     {

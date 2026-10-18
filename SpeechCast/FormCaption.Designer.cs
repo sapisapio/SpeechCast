@@ -1,4 +1,4 @@
-﻿namespace SpeechCast
+﻿namespace SpeechCastMe
 {
     partial class FormCaption
     {
@@ -47,9 +47,9 @@
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
-            this.Text = "SpeechCast字幕";
+            this.Text = "Speech Cast SP テロップ";
             this.TopMost = true;
-            this.TransparencyKey = System.Drawing.Color.Gray;
+            // 2026-10-18: per-pixel alpha is supplied by FormCaption.Alpha.cs.
             this.BackColorChanged += new System.EventHandler(this.FormCaption_BackColorChanged);
             this.SizeChanged += new System.EventHandler(this.FormCaption_SizeChanged);
             this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormCaption_Paint);

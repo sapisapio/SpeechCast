@@ -1,28 +1,28 @@
-#SpeechCast
+#SpeechCastMe
 
 ##概要
-* SpeechCastは「２ちゃんねる」「jbbs(したらば)」「わいわいkakiko」に書き込まれたレスを読み上げ、画面上に字幕のように表示するソフトです。
+* SpeechCastMeは「２ちゃんねる」「jbbs(したらば)」「わいわいkakiko」に書き込まれたレスを読み上げ、画面上に字幕のように表示するソフトです。
 * PeerCastで配信する際に使用するのを想定しています。
 
 ##ライセンス
 * フリーソフトです。
 * GPLv2ライセンスでソースを公開しています。
 
-　https://github.com/ggslyman/SpeechCast
+　https://github.com/ggslyman/SpeechCastMe
 
 ##サポートOS
 * Windows 7
    - 他のOSに関しては作者が動作チェックする環境がないため、非サポートとしています
 
 ##必要なソフト
-* SpeechCastを使用するためのソフトです。
+* SpeechCastMeを使用するためのソフトです。
   - Microsoft .NET Framework 4.5
   - SAPI5.1対応の音声エンジン もしくは Microsoft Speech Platform v11対応の音声エンジン
      - 標準では「Microsoft Sam」という日本語非対応の音声エンジンしかインストールされていないはずです。別途、日本語対応の音声エンジンを入手してください。
-     - MSより無料の日本語音声エンジン「Microsoft Server Speech Text to Speech Voice (ja-JP, Haruka)」が提供されていますが、通常インストールのみではSpeechCastが認識できませんので、同梱のMSHaruka_64bit.rrg、MSHaruka_32bit.regを実行してください。
+     - MSより無料の日本語音声エンジン「Microsoft Server Speech Text to Speech Voice (ja-JP, Haruka)」が提供されていますが、通常インストールのみではSpeechCastMeが認識できませんので、同梱のMSHaruka_64bit.rrg、MSHaruka_32bit.regを実行してください。
 
 ##使い方
-1. SpeechCast.exeをダブルクリックで起動します。
+1. SpeechCastMe.exeをダブルクリックで起動します。
 
 2. URLに掲示板のURLを入力します。　例) http://jbbs.shitaraba.net/bbs/read.cgi/game/42885/1380206807/
   - TOPページを入力するとスレ一覧が表示されます。
@@ -44,7 +44,7 @@
   
 　詳細は割愛します。  
   
-　設定は(ユーザホームディレクトリ)/Application Data/SpeechCast以下に記録されます。  
+　設定は(ユーザホームディレクトリ)/Application Data/SpeechCastMe以下に記録されます。  
 　起動しなくなったら上記ディレクトリごと削除してみてください。  
   
   
@@ -221,7 +221,7 @@
   - レスアンカーのポップアップ位置を調整
 
 * 09/06/15 1.0.5
-  - 「SpeechCastタイトルを非表示にする」設定を追加(デフォルトオフ)
+  - 「SpeechCastMeタイトルを非表示にする」設定を追加(デフォルトオフ)
   - レスおよびスレッド作成ウインドウに、再生ボタンを追加
   - レスおよびスレッド作成ウインドウにsageチェックボックスを追加
   - レスおよびスレッド作成ウインドウの名前およびメールアドレスを保存するように変更

@@ -8,9 +8,9 @@
     <ProjectGuid>{DFE33770-559F-4DA1-8C41-49E9A71123D6}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SpeechCast</RootNamespace>
-    <AssemblyName>SpeechCast</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <RootNamespace>SpeechCastMe</RootNamespace>
+    <AssemblyName>SpeechCastSP</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ApplicationIcon>app3.ico</ApplicationIcon>
     <FileUpgradeFlags>
@@ -113,6 +113,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="PresentationCore" />
     <Reference Include="System" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Speech">
@@ -124,6 +125,7 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BBSThread.cs" />
@@ -181,6 +183,7 @@
     <Compile Include="FormBookmarks.Designer.cs">
       <DependentUpon>FormBookmarks.cs</DependentUpon>
     </Compile>
+    <Compile Include="FormCaption.Alpha.cs" />
     <Compile Include="FormCaption.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -193,6 +196,9 @@
     <Compile Include="FormEditFontColors.Designer.cs">
       <DependentUpon>FormEditFontColors.cs</DependentUpon>
     </Compile>
+    <Compile Include="FormMain.ReaderUi.cs" />
+    <Compile Include="FormMain.Appearance.cs" />
+    <Compile Include="CaptionRasterizer.cs" />
     <Compile Include="FormMain.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -258,6 +264,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="FormSettings.resx">
       <DependentUpon>FormSettings.cs</DependentUpon>
@@ -274,11 +281,16 @@
       <SubType>Designer</SubType>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Include="app.config" />
-    <None Include="Properties\app.manifest" />
+    <None Include="app.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Properties\app.manifest">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
     </None>
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -302,7 +314,6 @@
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.5.1">
       <Visible>False</Visible>

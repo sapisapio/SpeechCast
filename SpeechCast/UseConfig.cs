@@ -5,10 +5,21 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Text.RegularExpressions;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     public class UserConfig
     {
+        // UI refresh preferences, 2026-10-18.
+        public string CommentLayout = "compact";
+        public string CommentTheme = "light";
+        public string CommentBackground = "";
+        public int CommentFontSize = 16;
+        public string CommentFontName = "Meiryo";
+        public bool CommentShowNumber = true;
+        public bool CommentShowName = false;
+        public bool CommentShowDate = false;
+        public bool CommentShowTime = false;
+        public bool CommentShowID = false;
         public UserConfig()
         {
         }
@@ -253,7 +264,7 @@ namespace SpeechCast
         /// お気に入りからスレを開いたときにレス表示欄を末尾まで移動するかのフラグ
         /// </summary>
         public bool enableMoveBottomFromBookmarks = false;
-        
+
         /// <summary>
         /// 文字数制限
         /// </summary>
@@ -307,7 +318,7 @@ namespace SpeechCast
 
 
         /// <summary>
-        /// 字幕ウィンドウのタイトル(SpeechCast)を隠すか？
+        /// 字幕ウィンドウのタイトル(SpeechCastMe)を隠すか？
         /// </summary>
         public bool HideCaptionTitle = false;
 
@@ -325,6 +336,11 @@ namespace SpeechCast
         /// 新着レスがあったときサウンドを鳴らす？
         /// </summary>
         public bool PlaySoundNewResponse = false;
+
+        /// <summary>
+        /// 新着レス毎にサウンドを鳴らす？
+        /// </summary>
+        public bool PlaySoundNewResevery = false;
 
         /// <summary>
         /// サウンド再生終了後に、読み上げを開始する
@@ -442,6 +458,18 @@ namespace SpeechCast
         /// </summary>
         public bool MilitaryTime = false;
         public bool ShowSecond = false;
+
+        /// <summary>
+        /// ミミック勝手に改造 代替字幕の文章
+        /// </summary>
+        public string CaptionTextBuffer = "";
+
+        /// <summary>
+        /// ミミック勝手に改造 スレ立て時の本文を記憶
+        /// </summary>
+        public bool FormWriteRecord;
+        public string FormWriteText = "";
+
         /// <summary>
         /// 字幕表示エリア自動縮小(ネットアクセスタイムアウト時に字幕が塗りつぶされる場合の暫定対応)
         /// </summary>

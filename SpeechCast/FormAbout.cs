@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Reflection;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     public partial class FormAbout : Form
     {
@@ -30,6 +30,11 @@ namespace SpeechCast
         private void buttonOK_Click(object sender, EventArgs e)
         {
             Close();
+        }
+
+        private void labelVersion_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

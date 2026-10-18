@@ -7,9 +7,10 @@ using System.Text;
 using System.Windows.Forms;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Media;
+using System.Threading.Tasks;
 
-namespace SpeechCast
+
+namespace SpeechCastMe
 {
     public partial class FormSettings : Form
     {
@@ -113,6 +114,7 @@ namespace SpeechCast
             this.checkBoxReduceFontSizeByWindowHeight.Checked = userConfig.ReduceFontSizeByWindowHeight;
             this.checkBoxSpeakTextBetweenBraces.Checked = userConfig.SpeakTextBetweenBracesEvenIfAAMode;
             this.checkBoxPlaySoundNewResponse.Checked = userConfig.PlaySoundNewResponse;
+            this.checkBoxPlaySoundNewResevery.Checked = userConfig.PlaySoundNewResevery;
             this.checkBoxPlaySoundSync.Checked = userConfig.PlaySoundNewResponseSync;
             //this.textBoxSoundFilePath.Text = userConfig.NewResponseSoundFilePathes;
             this.textBoxEditorFilePath.Text = userConfig.EditorFilePath;
@@ -216,6 +218,9 @@ namespace SpeechCast
             userConfig.SpeakTextBetweenBracesEvenIfAAMode = checkBoxSpeakTextBetweenBraces.Checked;
             userConfig.AAModeInvervalMillsec = System.Convert.ToInt32(this.numericUpDownAAModeInvervalMillsec.Value);
             userConfig.PlaySoundNewResponse = this.checkBoxPlaySoundNewResponse.Checked;
+            //ミミック勝手に改造　レスごとに着信音鳴らす設定項目追加
+            userConfig.PlaySoundNewResevery = this.checkBoxPlaySoundNewResevery.Checked;
+            //ミミック勝手に改造　ここまで
             FormMain.Instance.toolStripButtonPlaySoundNewResponse.Checked = checkBoxPlaySoundNewResponse.Checked;
             userConfig.PlaySoundNewResponseSync = this.checkBoxPlaySoundSync.Checked;
             //userConfig.NewResponseSoundFilePath = this.textBoxSoundFilePath.Text;
@@ -233,7 +238,6 @@ namespace SpeechCast
             userConfig.AutoReloadAlertMessage = this.textBoxAutoReloadAlertMessage.Text;
             userConfig.endThreadWarningResCount = (int)this.numericUpDownEndThreadWarningResCount.Value;
             userConfig.enableMoveBottomFromBookmarks = this.checkBoxEnableMoveBottomFromBookmarks.Checked;
-
             userConfig.OutputLogPath = this.textBoxOutputLogPath.Text;
             userConfig.OutputLogFormat = this.textBoxOutputLogFormat.Text.Replace("\r\n", "\n").Replace("\n", "\r\n");
             userConfig.OutputLog = this.checkOutputLog.Checked;
@@ -415,7 +419,7 @@ namespace SpeechCast
 
         }
 
-        private void buttonRunEditor_GetEditorFilePath(object sender, SpeechCast.Controls.EventEditorArgs e)
+        private void buttonRunEditor_GetEditorFilePath(object sender, SpeechCastMe.Controls.EventEditorArgs e)
         {
             e.EditorFilePath = textBoxEditorFilePath.Text;
         }
@@ -459,26 +463,41 @@ namespace SpeechCast
             FormMain.Instance.synthesizer.SpeakAsync(textTestSentence.Text);
         }
 
+        //ミミック勝手に改造 レス着信音ファイルパスを複数一括指定出来るように
         private void buttonNewResponseSoundFilePathesAdd_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
-
+            //ミミック勝手に改造 MP3も選べるようにする
             dialog.Title = "サウンドファイルパスの指定";
-            dialog.DefaultExt = "wav";
-            //dialog.Filter = "サウンドファイル(*.wav,*.mp3)|*.wav;*.mp3";
-            dialog.Filter = "サウンドファイル(*.wav)|*.wav";
+            dialog.Filter = "サウンドファイル(*.wav,*.mp3)|*.wav;*.mp3";
+            //dialog.Filter = "サウンドファイル(*.wav)|*.wav";
             dialog.CheckFileExists = true;
+            dialog.Multiselect = true;
             //dialog.FileName = textBoxSoundFilePath.Text;
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                listBoxNewResponseSoundFilePathes.Items.Add(dialog.FileName);
+                string[] fileNames = dialog.FileNames;
+                foreach (string item in fileNames)
+                {
+                    listBoxNewResponseSoundFilePathes.Items.Add(item);
+                }
+
             }
         }
+        
 
         private void buttonNewResponseSoundFilePathesRemove_Click(object sender, EventArgs e)
         {
-            listBoxNewResponseSoundFilePathes.Items.Remove(listBoxNewResponseSoundFilePathes.SelectedItem);
+
+            while (listBoxNewResponseSoundFilePathes.SelectedItems.Count != 0)
+            {
+                listBoxNewResponseSoundFilePathes.Items.RemoveAt(listBoxNewResponseSoundFilePathes.SelectedIndices[0]);
+            }
+
+
         }
+
+        //ミミック勝手に改造 ここまで
 
         private void buttonCaptionIndentPaddingLeft_Click(object sender, EventArgs e)
         {
@@ -515,30 +534,16 @@ namespace SpeechCast
                 {
                     try
                     {
-                        //WMPLib.WindowsMediaPlayer mp = new WMPLib.WindowsMediaPlayer(); /* WMP */
-                        //mp.URL = NewResponseSoundFilePath; /* 再生したい音声ファイルのパス */
-                        //mp.settings.volume = UserConfig.PlayVolume;
-                        //if (UserConfig.PlaySoundNewResponseSync)
-                        //{
-                        //    mp.controls.play();
-                        //    while((int)mp.playState == 1) /* 停止しているか判定 */
-                        //    {
-                        //        System.Threading.Thread.Sleep(1000);
-                        //    }
-                        //    mp.close();　/* 音声ファイルを切り替える前に使うといいらしい */
-                        //}
-                        //else
-                        //{
-                        //    mp.controls.play();
-                        //}
-                        if (FormMain.Instance.soundPlayerNewResponse == null)
-                        {
-                            FormMain.Instance.soundPlayerNewResponse = new SoundPlayer();
-                        }
-                        FormMain.Instance.soundPlayerNewResponse.SoundLocation = NewResponseSoundFilePath;
-                        FormMain.Instance.soundPlayerNewResponse.Load();
-                        FormMain.Instance.soundPlayerNewResponse.Play();
-                        FormMain.Instance.soundPlayerNewResponse.Dispose();
+                        //ミミック勝手に改造　テスト再生側もMP3対応
+                        //var newplaysound = new Microsoft.DirectX.AudioVideoPlayback.Audio(NewResponseSoundFilePath);
+                        //newplaysound.Volume = (-100 * (100 - FormMain.UserConfig.PlayVolume)) / 2;
+
+                        System.Windows.Media.MediaPlayer newplaysound;
+                        newplaysound = new System.Windows.Media.MediaPlayer();
+                        newplaysound.Open(new System.Uri(NewResponseSoundFilePath));
+                        newplaysound.Volume = FormMain.UserConfig.PlayVolume *0.01;
+                        newplaysound.Play();
+                        //ミミック勝手に改造　ここまで
                     }
                     catch (Exception ex)
                     {
@@ -627,6 +632,82 @@ namespace SpeechCast
 
         }
 
+        private void textBoxOutputLogFormat_TextChanged(object sender, EventArgs e)
+        {
 
-     }
+        }
+
+        private void groupBox6_Enter(object sender, EventArgs e)
+        {
+
+        }
+
+        //listBoxNewResponseSoundFilePathesのDragEnterイベントハンドラ
+        private void listBoxNewResponseSoundFilePathes_DragEnter(object sender,
+            System.Windows.Forms.DragEventArgs e)
+        {
+            //コントロール内にドラッグされたとき実行される
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                //ドラッグされたデータ形式を調べ、ファイルのときはコピーとする
+                e.Effect = DragDropEffects.Copy;
+            else
+                //ファイル以外は受け付けない
+                e.Effect = DragDropEffects.None;
+        }
+
+        //listBoxNewResponseSoundFilePathesのDragDropイベントハンドラ
+        private void listBoxNewResponseSoundFilePathes_DragDrop(object sender,
+            System.Windows.Forms.DragEventArgs e)
+        {
+            //コントロール内にドロップされたとき実行される
+            //ドロップされたすべてのファイル名を取得する
+            string[] fileName =
+                (string[])e.Data.GetData(DataFormats.FileDrop, false);
+            //string nanfedeya = "dasdaw";
+            int fileNamenum = 0;
+            bool checkok = true;
+            //string fileNamechecked = "gaedada";
+            while(fileNamenum < fileName.Length)
+            {
+                string extcheck = Path.GetExtension(fileName[fileNamenum]);
+                if(extcheck == ".mp3"|| extcheck == ".wav")
+                    fileNamenum = fileNamenum + 1;
+                else
+                {
+                    checkok = false;
+                    fileNamenum = fileNamenum + 1;
+                }
+            }
+            if (fileNamenum == fileName.Length)
+            {
+                if (checkok)
+                {
+                    //listBoxNewResponseSoundFilePathesに追加する
+                    listBoxNewResponseSoundFilePathes.Items.AddRange(fileName);
+                    fileNamenum = 0;
+                }
+                else
+                {
+                    fileNamenum = 0;
+                }
+            }
+
+                // fileName.Length;
+
+
+
+                //listBoxNewResponseSoundFilePathesに追加する
+                //listBoxNewResponseSoundFilePathes.Items.AddRange(fileName);
+        }
+
+        private void label20_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void listBoxNewResponseSoundFilePathes_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+    }
 }

@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     class BBSThread
     {
@@ -16,7 +16,9 @@ namespace SpeechCast
 
         static Regex jbbsRegex = new Regex(@"^(\d+).cgi,(.+)\((\d+)\)");
         static Regex nichanRegex = new Regex(@"^(\d+).dat<>(.+)\((\d+)\)");
-
+        // ミミックかってに改造 ぜろちゃんねる対応追加
+        static Regex zerochanRegex = new Regex(@"^(\d+).dat<>(.+)\((\d+)\)");
+        // ミミックかってに改造
 
         public ListViewItem CreateListViewItem()
         {
@@ -59,9 +61,23 @@ namespace SpeechCast
                             ThreadID = m.Groups[1].Value;
                             success = true;
                         }
+
                         break;
                     }
+                case Response.BBSStyle.zerochan:
+                    {
+                        Match m = zerochanRegex.Match(rawText);
 
+                        if (m.Success)
+                        {
+                            Text = m.Groups[2].Value;
+                            ResponseCount = m.Groups[3].Value;
+                            ThreadID = m.Groups[1].Value;
+                            success = true;
+                        }
+
+                        break;
+                    }
             }
 
             if (success)

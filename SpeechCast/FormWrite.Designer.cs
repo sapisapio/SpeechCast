@@ -1,4 +1,4 @@
-﻿namespace SpeechCast
+﻿namespace SpeechCastMe
 {
     partial class FormWrite
     {
@@ -38,8 +38,9 @@
             this.buttonOK = new System.Windows.Forms.Button();
             this.buttonCancel = new System.Windows.Forms.Button();
             this.buttonPlay = new System.Windows.Forms.Button();
-            this.buttonRunEditor = new SpeechCast.Controls.ButtonRunEditor();
             this.checkBoxSage = new System.Windows.Forms.CheckBox();
+            this.checkBoxRecord = new System.Windows.Forms.CheckBox();
+            this.buttonRunEditor = new SpeechCastMe.Controls.ButtonRunEditor();
             this.SuspendLayout();
             // 
             // labelThreadTitle
@@ -128,20 +129,9 @@
             this.buttonPlay.Name = "buttonPlay";
             this.buttonPlay.Size = new System.Drawing.Size(46, 23);
             this.buttonPlay.TabIndex = 7;
+            this.buttonPlay.Text = "更新";
             this.buttonPlay.UseVisualStyleBackColor = true;
             this.buttonPlay.Click += new System.EventHandler(this.buttonPlay_Click);
-            // 
-            // buttonRunEditor
-            // 
-            this.buttonRunEditor.AutoSize = true;
-            this.buttonRunEditor.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.buttonRunEditor.EditorErrorMessage = "エディターが見つかりません。\\n設定→その他タブで設定してください。";
-            this.buttonRunEditor.Location = new System.Drawing.Point(499, 81);
-            this.buttonRunEditor.Name = "buttonRunEditor";
-            this.buttonRunEditor.Size = new System.Drawing.Size(53, 30);
-            this.buttonRunEditor.TabIndex = 6;
-            this.buttonRunEditor.TextBox = this.textBoxContents;
-            this.buttonRunEditor.GetEditorFilePath += new SpeechCast.Controls.GetEditorFilePathEventHandler(this.buttonRunEditor_GetEditorFilePath);
             // 
             // checkBoxSage
             // 
@@ -154,6 +144,28 @@
             this.checkBoxSage.UseVisualStyleBackColor = true;
             this.checkBoxSage.CheckedChanged += new System.EventHandler(this.checkBoxSage_CheckedChanged);
             // 
+            // checkBoxRecord
+            // 
+            this.checkBoxRecord.AutoSize = true;
+            this.checkBoxRecord.Location = new System.Drawing.Point(13, 228);
+            this.checkBoxRecord.Name = "checkBoxRecord";
+            this.checkBoxRecord.Size = new System.Drawing.Size(125, 16);
+            this.checkBoxRecord.TabIndex = 9;
+            this.checkBoxRecord.Text = "書き込み内容を記憶";
+            this.checkBoxRecord.UseVisualStyleBackColor = true;
+            // 
+            // buttonRunEditor
+            // 
+            this.buttonRunEditor.AutoSize = true;
+            this.buttonRunEditor.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.buttonRunEditor.EditorErrorMessage = "エディターが見つかりません。\\n設定→その他タブで設定してください。";
+            this.buttonRunEditor.Location = new System.Drawing.Point(499, 81);
+            this.buttonRunEditor.Name = "buttonRunEditor";
+            this.buttonRunEditor.Size = new System.Drawing.Size(53, 30);
+            this.buttonRunEditor.TabIndex = 6;
+            this.buttonRunEditor.TextBox = this.textBoxContents;
+            this.buttonRunEditor.GetEditorFilePath += new SpeechCastMe.Controls.GetEditorFilePathEventHandler(this.buttonRunEditor_GetEditorFilePath);
+            // 
             // FormWrite
             // 
             this.AcceptButton = this.buttonOK;
@@ -161,6 +173,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.buttonCancel;
             this.ClientSize = new System.Drawing.Size(554, 253);
+            this.Controls.Add(this.checkBoxRecord);
             this.Controls.Add(this.checkBoxSage);
             this.Controls.Add(this.buttonPlay);
             this.Controls.Add(this.buttonRunEditor);
@@ -181,8 +194,9 @@
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "スレッド作成";
-            this.Shown += new System.EventHandler(this.FormWrite_Shown);
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormWrite_FormClosing);
+            this.Load += new System.EventHandler(this.FormWrite_Load);
+            this.Shown += new System.EventHandler(this.FormWrite_Shown);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -199,8 +213,9 @@
         private System.Windows.Forms.TextBox textBoxMailAddress;
         private System.Windows.Forms.Button buttonOK;
         private System.Windows.Forms.Button buttonCancel;
-        private SpeechCast.Controls.ButtonRunEditor buttonRunEditor;
+        private SpeechCastMe.Controls.ButtonRunEditor buttonRunEditor;
         private System.Windows.Forms.Button buttonPlay;
         private System.Windows.Forms.CheckBox checkBoxSage;
+        private System.Windows.Forms.CheckBox checkBoxRecord;
     }
 }

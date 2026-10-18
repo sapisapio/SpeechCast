@@ -8,7 +8,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     public partial class FormBBSThreads : Form
     {
@@ -51,7 +51,8 @@ namespace SpeechCast
                     break;
                 case Response.BBSStyle.yykakiko:
                 case Response.BBSStyle.nichan:
-                    encodingName = "Shift_JIS";
+                case Response.BBSStyle.zerochan:
+                     encodingName = "Shift_JIS";
                     break;
             }
             //encodingName = "Shift_JIS";
@@ -162,6 +163,17 @@ namespace SpeechCast
                             , thread.ThreadID);
                         return true;
                     }
+                    // ミミックかってに改造 ぜろちゃんねる対応追加
+                    m = Communicator.zerochanBaseRegex.Match(BaseURL);
+                    if (m.Success)
+                    {
+                        ThreadURL = string.Format("{0}/test/read.cgi/{1}/{2}/"
+                            , m.Groups[1].Value
+                            , m.Groups[2].Value
+                            , thread.ThreadID);
+                        return true;
+                    }
+                    // ミミックかってに改造 ここまで
                     m = Communicator.YYBaseRegex.Match(BaseURL);
                     if (m.Success)
                     {

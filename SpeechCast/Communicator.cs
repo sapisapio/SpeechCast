@@ -6,17 +6,22 @@ using System.Net;
 using System.Web;
 
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     class Communicator
     {
-        public static Regex JBBSRegex = new System.Text.RegularExpressions.Regex(@"(http://jbbs.livedoor.jp|http://jbbs.shitaraba.net)/bbs/read.cgi(/(\w+)/(\d+)/(\d+)/)");
+        // ミミックかってに改造　したらばSSL対応後のURLも含める
+        public static Regex JBBSRegex = new System.Text.RegularExpressions.Regex(@"(http://jbbs.livedoor.jp|http://jbbs.shitaraba.net|https://jbbs.shitaraba.net)/bbs/read.cgi(/(\w+)/(\d+)/(\d+)/)");
         public static Regex YYRegex = new System.Text.RegularExpressions.Regex(@"(http://yy.+\..+|http://bbs\.aristocratism\.info|http://www.+\.atchs\.jp)/.+/read.cgi/(\w+)/(\d+)/");
         public static Regex NichanRegex = new System.Text.RegularExpressions.Regex(@"(http://.+2ch\.net)/.+/read.cgi/(\w+)/(\d+)/");
+        public static Regex zerochanRegex = new System.Text.RegularExpressions.Regex(@"(http://(?!jbbs).+|https://(?!jbbs).+)/.+/read.cgi/(\w+)/(\d+)/");
 
-        public static Regex JBBSBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://jbbs.livedoor.jp|http://jbbs.shitaraba.net)/(\w+)/(\d+)/");
+        public static Regex JBBSBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://jbbs.livedoor.jp|http://jbbs.shitaraba.net|https://jbbs.shitaraba.net)/(\w+)/(\d+)/");
         public static Regex YYBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://yy.+\..+|http://bbs\.aristocratism\.info|http://www.+\.atchs\.jp)/(\w+)/");
         public static Regex NichanBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://.+2ch\.net)/(\w+)/");
+        public static Regex zerochanBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://(?!jbbs).+|https://(?!jbbs).+)/(\w+)/");
+
+        // ミミックかってに改造　ここまで
 
         public static Regex htmlBodyRegex = new System.Text.RegularExpressions.Regex("<body.*?>(.*)</body>", RegexOptions.IgnoreCase);
 
@@ -41,6 +46,10 @@ namespace SpeechCast
                 case Response.BBSStyle.nichan:
                     m = NichanRegex.Match(ThreadURL);
                     break;
+                case Response.BBSStyle.zerochan:
+                    m = zerochanRegex.Match(ThreadURL);
+                    break;
+
             }
             return m;
         }
@@ -59,6 +68,11 @@ namespace SpeechCast
                 case Response.BBSStyle.nichan:
                     m = NichanBaseRegex.Match(BaseURL);
                     break;
+                // ミミックかってに改造 外部掲示板対応追加
+                case Response.BBSStyle.zerochan:
+                    m = zerochanBaseRegex.Match(BaseURL);
+                    break;
+                // ミミックかってに改造 ここまで
             }
             return m;
         }
@@ -76,6 +90,11 @@ namespace SpeechCast
                 case Response.BBSStyle.nichan:
                     encodingName = "Shift_JIS";
                     break;
+                // ミミックかってに改造 外部掲示板対応追加
+                case Response.BBSStyle.zerochan:
+                    encodingName = "Shift_JIS";
+                    break;
+                // ミミックかってに改造 ここまで
             }
             return Encoding.GetEncoding(encodingName);
         }
@@ -167,8 +186,17 @@ namespace SpeechCast
                 {
                     case Response.BBSStyle.jbbs:
                         {
-                            url = string.Format("{0}/bbs/write.cgi", m.Groups[1].Value);
-
+                            //ミミック勝手に改造　仕様変更でレス書き込み･スレッド作成が出来なくなっていたのを合わせて修正
+                            if (isThreadCreation)
+                            {
+                                url = string.Format("{0}/bbs/write.cgi/{1}/{2}/{3}/", m.Groups[1].Value, m.Groups[3].Value, m.Groups[4].Value, "new");
+                            }
+                            else
+                            {
+                                url = string.Format("{0}/bbs/write.cgi{1}", m.Groups[1].Value, m.Groups[2].Value);
+                            }
+                            
+                            //ミミック勝手に改造　ここまで
                             string submitText = "書き込む";
                             string additionalParam = "";
 
@@ -195,7 +223,7 @@ namespace SpeechCast
                             break;
                         }
                     case Response.BBSStyle.yykakiko:
-                    case Response.BBSStyle.nichan:
+                    case Response.BBSStyle.zerochan:
                         {
                             url = string.Format("{0}/test/bbs.cgi", m.Groups[1].Value);
 
@@ -222,7 +250,7 @@ namespace SpeechCast
                                 submitText = "上記全てを承諾して書き込む";
                             }
 
-                            if (Response.Style == Response.BBSStyle.nichan)
+                            if (Response.Style == Response.BBSStyle.zerochan)
                             {
                                 additionalParam += "&tepo=don";
                             }
@@ -247,7 +275,7 @@ namespace SpeechCast
                                 url += "?guid=ON";
                             }
 
-                            if (Response.Style == Response.BBSStyle.nichan && isThreadCreation)
+                            if (Response.Style == Response.BBSStyle.zerochan && isThreadCreation)
                             {
                                 referer = url;
                             }
@@ -275,7 +303,9 @@ namespace SpeechCast
                 //POST送信するデータの長さを指定
                 webReq.ContentLength = postDataBytes.Length;
                 //
-                webReq.Referer = referer;
+                // ミミックかってに改造 送信するリファラの設定を対応出来るように変更
+                webReq.Referer = string.Format("{0}/{1}/{2}/", m.Groups[1].Value, m.Groups[3].Value, m.Groups[4].Value);
+                // ミミックかってに改造 ここまで
 
 
                 System.Net.HttpWebResponse webRes = null;
@@ -297,7 +327,7 @@ namespace SpeechCast
                     //Cookie名と値を列挙する
                     //foreach (System.Net.Cookie cook in cookies)
                     //{
-                    //    Console.WriteLine("{0}={1}", cook.Name, cook.Value);
+                    //   Console.WriteLine("{0}={1}", cook.Name, cook.Value);
                     //}
                     //取得したCookieを保存しておく
                     cookieContainer.Add(cookies);
@@ -345,7 +375,7 @@ namespace SpeechCast
             return false;
         }
 
-        public string getThreadUrl(string baseURL,string ThreadID)
+        public string GetThreadUrl(string baseURL,string ThreadID)
         {
             Match m = Communicator.JBBSBaseRegex.Match(baseURL);
             string ThreadURL;
@@ -376,6 +406,17 @@ namespace SpeechCast
                     , ThreadID);
                 return ThreadURL;
             }
+            // ミミックかってに改造 ぜろちゃんねる対応追加
+            m = Communicator.zerochanBaseRegex.Match(baseURL);
+            if (m.Success)
+            {
+                ThreadURL = string.Format("{0}/test/read.cgi/{1}/{2}/"
+                    , m.Groups[1].Value
+                    , m.Groups[2].Value
+                    , ThreadID);
+                return ThreadURL;
+            }
+            // ミミックかってに改造 ここまで
             return "";
         }
     

@@ -1,4 +1,4 @@
-﻿namespace SpeechCast
+﻿namespace SpeechCastMe
 {
     partial class FormAbout
     {
@@ -57,11 +57,12 @@
             // 
             this.labelVersion.AutoSize = true;
             this.labelVersion.Font = new System.Drawing.Font("MS UI Gothic", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.labelVersion.Location = new System.Drawing.Point(54, 31);
+            this.labelVersion.Location = new System.Drawing.Point(25, 33);
             this.labelVersion.Name = "labelVersion";
-            this.labelVersion.Size = new System.Drawing.Size(169, 16);
+            this.labelVersion.Size = new System.Drawing.Size(191, 16);
             this.labelVersion.TabIndex = 3;
-            this.labelVersion.Text = "SpeechCast Version ";
+            this.labelVersion.Text = "Speech Cast SP Version ";
+            this.labelVersion.Click += new System.EventHandler(this.labelVersion_Click);
             // 
             // buttonOK
             // 

@@ -1,4 +1,4 @@
-﻿namespace SpeechCast.Controls
+﻿namespace SpeechCastMe.Controls
 {
     partial class ButtonRunEditor
     {

@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // アセンブリに関する一般情報は以下の属性セットをとおして制御されます。
 // アセンブリに関連付けられている情報を変更するには、
 // これらの属性値を変更してください。
-[assembly: AssemblyTitle("SpeechCast")]
+[assembly: AssemblyTitle("Speech Cast SP")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("すれいまん")]
-[assembly: AssemblyProduct("SpeechCast")]
-[assembly: AssemblyCopyright("Copyright © すれいまん 2014 Copyright © よっしー 2008,2009,2013")]
+[assembly: AssemblyCompany("ミミック")]
+[assembly: AssemblyProduct("Speech Cast SP")]
+[assembly: AssemblyCopyright("Copyright © ミミック 2018,2019,2020,2021 Copyright © すれいまん 2014 Copyright © よっしー 2008,2009,2013")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // すべての値を指定するか、下のように '*' を使ってビルドおよびリビジョン番号を 
 // 既定値にすることができます:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.0.1.23")]
-[assembly: AssemblyFileVersion("2.0.1.23")]
+[assembly: AssemblyVersion("2.0.2.3")]
+[assembly: AssemblyFileVersion("2.0.2.3")]

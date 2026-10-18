@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Text;
 using System.Windows.Forms;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     public partial class FormCaption : Form
     {
@@ -15,15 +15,15 @@ namespace SpeechCast
         public FormCaption()
         {
             InitializeComponent();
-            this.titleText = "SpeechCast";
+            this.titleText = "SpeechcastSP";
         }
 
         public void setTitle(string title){
-            if(title!=""){
-                this.titleText = title;
-            }else{
-                this.titleText = "SpeechCast";
-            }
+            string next = string.IsNullOrEmpty(title) ? "SpeechcastSP" : title;
+            if (titleText == next) return;
+            this.titleText = next;
+            this.Text = "Speech Cast SP — " + this.titleText;
+            Refresh();
         }
         public static FormCaption Instance;
 
@@ -40,7 +40,7 @@ namespace SpeechCast
                 return this.borderVisible;
             }
         }
-        private void FormCaption_Paint(object sender, PaintEventArgs e)
+        private void PaintCaptionContent(object sender, PaintEventArgs e)
         {
             if (borderVisible)            
             {
@@ -59,7 +59,7 @@ namespace SpeechCast
 
                 Rectangle captionRect = this.ClientRectangle;
 
-                const int offsetY = 7;
+                int offsetY = borderVisible || !FormMain.UserConfig.HideCaptionTitle ? 25 : 7;
                 captionRect.Y = offsetY;
                 captionRect.Height -= offsetY;
 
@@ -127,7 +127,9 @@ namespace SpeechCast
         bool IsCaptionInRect(CaptionFont captionFont)
         {
 
-            SizeF size = this.CreateGraphics().MeasureString(CaptionText, captionFont.CreateFont(), 10000) ;
+            SizeF size;
+            using (var graphics = this.CreateGraphics())
+            using (var font = captionFont.CreateFont()) size = graphics.MeasureString(CaptionText, font, 10000);
             
             if (FormMain.UserConfig.ReduceFontSizeByWindowWidth && size.Width > (float)Width - 20.0f)
             {
@@ -177,78 +179,28 @@ namespace SpeechCast
 
         public static void DrawTitle(PaintEventArgs e)
         {
-            if (FormCaption.Instance.borderVisible || FormMain.UserConfig.HideCaptionTitle == false)
+            var caption = FormCaption.Instance;
+            if (!caption.borderVisible && FormMain.UserConfig.HideCaptionTitle) { caption.drawRect = Rectangle.Empty; return; }
+            using (var font = new Font("Yu Gothic UI", 9F, FontStyle.Regular))
+            using (var format = new StringFormat(StringFormat.GenericTypographic) { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+            using (var background = new SolidBrush(Color.FromArgb(235, 31, 41, 55)))
+            using (var foreground = new SolidBrush(Color.FromArgb(238, 242, 247)))
             {
-                StringFormat sf = new StringFormat();
-                SizeF stringSize = e.Graphics.MeasureString(FormCaption.Instance.titleText, FormCaption.Instance.Font, 1000, sf);
-                FormCaption.Instance.drawRect.Width = (int)stringSize.Width + 3;
-                FormCaption.Instance.drawRect.Height = (int)stringSize.Height + 3;
-
-                //タイトル描画
-                e.Graphics.FillRectangle(Brushes.LightPink, FormCaption.Instance.drawRect);
-                e.Graphics.DrawRectangle(new Pen(Color.Black), FormCaption.Instance.drawRect);
-                Rectangle stringRect = FormCaption.Instance.drawRect;
-                stringRect.Inflate(-1, -1);
-
-                e.Graphics.DrawString(FormCaption.Instance.titleText, FormCaption.Instance.Font, Brushes.Black, stringRect);
-                //e.Graphics.DrawString(string.Format("size={0:0.0}", fontSize), this.Font, Brushes.Black, stringRect);
-
-
-
+                string label = caption.titleText;
+                int available = Math.Max(1, caption.ClientSize.Width - 8);
+                int width = Math.Min(available, (int)Math.Ceiling(e.Graphics.MeasureString(label, font, new SizeF(100000, 1000), format).Width) + 8);
+                caption.drawRect = new Rectangle(4, 3, width, (int)Math.Ceiling(font.GetHeight(e.Graphics)) + 4);
+                e.Graphics.FillRectangle(background, caption.drawRect);
+                var textRect = caption.drawRect;
+                textRect.Inflate(-4, 0);
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                e.Graphics.DrawString(label, font, foreground, textRect, format);
             }
         }
 
         public static void DrawCaption(Graphics g, Rectangle captionRect, string captionText, CaptionFont captionFont, bool isAAMode)
         {
-            System.Drawing.Font font = captionFont.CreateFont();
-
-            StringFormat stringFormat = new StringFormat();
-            //TextFormatFlags txtFormatFlags = new TextFormatFlags();
-            //txtFormatFlags = TextFormatFlags.Top | TextFormatFlags.Left;
-            if (captionFont.IsDirectionVertical)
-            {
-                stringFormat.FormatFlags = StringFormatFlags.DirectionVertical | StringFormatFlags.DirectionRightToLeft;
-            }
-            List<Point> offsets = new List<Point>();
-
-            for (int i = 0; i < captionFont.BorderSize; i++)
-            {
-                offsets.Add(new Point(i, -captionFont.BorderSize + i));
-                offsets.Add(new Point(captionFont.BorderSize - i, i));
-                offsets.Add(new Point(-i, captionFont.BorderSize - i));
-                offsets.Add(new Point(-captionFont.BorderSize + i, -i));
-            }
-            captionRect.X = captionRect.Left + FormMain.UserConfig.CaptionIndentLeftPadding;
-            captionRect.Y = captionRect.Top + FormMain.UserConfig.CaptionIndentTopPadding;
-            foreach (Point ofs in offsets)
-            {
-                Rectangle borderRect = captionRect;
-
-                borderRect.X += ofs.X;
-                borderRect.Y += ofs.Y;
-
-                if (isAAMode)
-                {
-                    //TextRenderer.DrawText(g, captionText, font, borderRect, FormMain.UserConfig.AACaptionFont.Colors.BorderColor, txtFormatFlags);
-                    g.DrawString(captionText, font, captionFont.BorderBrush, borderRect.X, borderRect.Y);
-                }
-                else
-                {
-                    //TextRenderer.DrawText(g, captionText, font, borderRect, FormMain.UserConfig.CaptionFont.Colors.BorderColor, txtFormatFlags);
-                    g.DrawString(captionText, font, captionFont.BorderBrush, borderRect, stringFormat);
-                }
-            }
-
-            if (isAAMode)
-            {
-                //TextRenderer.DrawText(g, captionText, font, captionRect, FormMain.UserConfig.AACaptionFont.Colors.HighForeColor, txtFormatFlags);
-                g.DrawString(captionText, font, captionFont.GetForeBrush(captionRect), captionRect.X, captionRect.Y);
-            }
-            else
-            {
-                //TextRenderer.DrawText(g, captionText, font, captionRect, FormMain.UserConfig.CaptionFont.Colors.HighForeColor, txtFormatFlags);
-                g.DrawString(captionText, font, captionFont.GetForeBrush(captionRect), captionRect, stringFormat);
-            }
+            CaptionRasterizer.Draw(g, captionRect, captionText, captionFont, isAAMode);
         }
 
 
@@ -325,7 +277,7 @@ namespace SpeechCast
                         Point pt = new Point(x, y);
                         pt = this.PointToClient(pt);
 
-                        if (pt.X <= drawRect.Width && pt.Y <= drawRect.Height)
+                        if (drawRect.Contains(pt))
                         {
                             m.Result = (IntPtr)HTCAPTION;
                             break;;

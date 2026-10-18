@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Windows.Forms;
 
-namespace SpeechCast.Controls
+namespace SpeechCastMe.Controls
 {
     class ToolStripTrackBar : ToolStripControlHost
     {

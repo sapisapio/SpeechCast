@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 
-namespace SpeechCast
+namespace SpeechCastMe
 {
     class Response
     {
@@ -22,7 +22,6 @@ namespace SpeechCast
         public int ScrollY = -1;
         public static BBSStyle Style;
         public const string AnchorUrl = "http://res/";
-
         public static int MaxResponseCount
         {
             get
@@ -32,8 +31,13 @@ namespace SpeechCast
                     case BBSStyle.jbbs:
                         return 1000;
                     case BBSStyle.yykakiko:
+                    // ミミックかってに改造 ぜろちゃんねる対応追加
+                    case BBSStyle.zerochan:
+                        return 1000;
+                    // ミミックかってに改造 ここまで
                     case BBSStyle.nichan:
                         return 1001;
+
                 }
                 return 1000;
             }
@@ -57,6 +61,10 @@ namespace SpeechCast
             /// 2ch形式
             /// </summary>
             nichan,
+            /// <summary>
+            /// ぜろちゃんねる形式
+            /// </summary>
+            zerochan,
         }
 
         public Response()
@@ -102,6 +110,37 @@ namespace SpeechCast
                     break;
                 case BBSStyle.yykakiko:
                 case BBSStyle.nichan:
+                    {
+                        string[] values = rawText.Split(delimStrings, StringSplitOptions.None);
+
+                        if (values.Length > 4)
+                        {
+                            this.Name = ConvertToText(values[0]);
+                            this.MailAddress = ConvertToText(values[1]);
+
+                            string dateTime = values[2];
+                            string id = "";
+
+                            string[] strs = dateTime.Split(idStrings, StringSplitOptions.None);
+
+                            if (strs.Length > 1)
+                            {
+                                dateTime = strs[0];
+                                id = strs[1];
+                            }
+
+                            this.DateTime = dateTime;
+                            this.Text = ConvertToText(values[3]);
+                            this.ThreadTitle = values[4];
+                            this.ID = id;
+
+                            //HTMLコンバートは最後に行う
+                            this.Html = ConvertToHtml(values[3]);
+                            return true;
+                        }
+                    }
+                    break;
+                case BBSStyle.zerochan:
                     {
                         string[] values = rawText.Split(delimStrings, StringSplitOptions.None);
 
@@ -209,50 +248,20 @@ namespace SpeechCast
 
         private string ConvertToHtml(string content)
         {
-            content = toTextRegexHref.Replace(content, toTextMatchEvalGroupRemoveLink); //リンクははずす
-            content = toHtmlRegexUrl.Replace(content, toTextMatchEvalGroupResAnchor); //リンクをつける
-            content = toHtmlRegexGtGt.Replace(content, toTextMatchEvalGroupAddLink); //レスアンカー
-
-            //string id = "ID:" + this.ID;
-
-            //string headerHtml = string.Format("<a name=\"res{0}\"</a><table border=0 bgcolor=\"#CCCCCC\"><tr><td><font color=\"#000000\">{0}: <a href=\"mailto:{1}\">{2}</a>: {3} {4} </font></td></tr></table>"
-            //    , this.Number
-            //    , this.MailAddress
-            //    , this.Name
-            //    , this.DateTime
-            //    , id);
-
-            StringBuilder sb = new StringBuilder();
-            sb.Append("<a name=\"res");
-            sb.Append(this.Number);
-            sb.Append("\"></a><table border=0 bgcolor=\"#CCCCCC\"><tr><td><font color=\"#000000\">");
-            sb.Append(this.Number);
-            sb.Append(": ");
-            if (this.MailAddress != "")
-            {
-                sb.Append("<a href=\"mailto:");
-                sb.Append(this.MailAddress);
-                sb.Append("\"><b>");
-                sb.Append(this.Name);
-                sb.Append("</b></a>: ");
-            }
-            else
-            {
-                sb.Append("<b>");
-                sb.Append(this.Name);
-                sb.Append("</b>: ");
-            }
-            sb.Append(this.DateTime);
-            sb.Append(" ID:");
-            sb.Append(this.ID);
-            sb.Append("  </font></td></tr></table>");
-
-            sb.Append("<blockquote>");
-            sb.Append(content);
-            sb.Append("</blockquote>");
-
-            string txt = sb.ToString();
-            return txt;
+            // UI refresh, 2026-10-18: encode board text before building display markup.
+            content = HttpUtility.HtmlEncode(ConvertToText(content)).Replace("\r\n", "\n");
+            content = toHtmlRegexUrl.Replace(content, toTextMatchEvalGroupResAnchor);
+            content = toHtmlRegexGtGt.Replace(content, toTextMatchEvalGroupAddLink);
+            string timestamp = DateTime ?? "";
+            Match date = Regex.Match(timestamp, @"\d{4}/\d{1,2}/\d{1,2}(?:[（(][^）)]*[）)])?");
+            Match time = Regex.Match(timestamp, @"\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?");
+            return "<div class=\"comment\"><a class=\"anchor\" name=\"res" + Number + "\"></a>"
+                + "<span class=\"meta\"><span class=\"field number\">" + Number + ":</span>"
+                + "<span class=\"field author\">" + HttpUtility.HtmlEncode(Name) + "</span>"
+                + "<span class=\"field date\">" + HttpUtility.HtmlEncode(date.Value) + "</span>"
+                + "<span class=\"field time\">" + HttpUtility.HtmlEncode(time.Value) + "</span>"
+                + "<span class=\"field identity\">" + (string.IsNullOrEmpty(ID) ? "" : "ID:" + HttpUtility.HtmlEncode(ID)) + "</span></span>"
+                + "<span class=\"body\">" + content + "</span></div>";
         }
 
         private static string ReplaceGroupRemoveLink(Match m)
@@ -278,6 +287,7 @@ namespace SpeechCast
             StringBuilder sb = new StringBuilder();
 
             sb.Append("<a href=\"http");
+            sb.Append(m.Groups[2].Value);
             sb.Append(m.Groups[3].Value);
             sb.Append("\">");
             //sb.Append("\" target=\"_blank\">");

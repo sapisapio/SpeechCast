@@ -1,4 +1,4 @@
-﻿namespace SpeechCast
+﻿namespace SpeechCastMe
 {
     partial class FormViewResource
     {

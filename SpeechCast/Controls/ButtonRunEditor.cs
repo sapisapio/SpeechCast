@@ -8,7 +8,7 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using System.IO;
 
-namespace SpeechCast.Controls
+namespace SpeechCastMe.Controls
 {
     public partial class ButtonRunEditor : UserControl
     {
@@ -35,7 +35,7 @@ namespace SpeechCast.Controls
                     try
                     {
 
-                        tempFilePath = Path.Combine(Path.Combine(Path.GetTempPath(), "SpeechCast"), DateTime.Now.ToString("yyyyMMdd_hhmmss") + ".txt");
+                        tempFilePath = Path.Combine(Path.Combine(Path.GetTempPath(), "SpeechCastMe"), DateTime.Now.ToString("yyyyMMdd_hhmmss") + ".txt");
 
                         string tempDir = Path.GetDirectoryName(tempFilePath);
 
