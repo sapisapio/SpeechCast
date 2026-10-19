@@ -7,6 +7,13 @@ using System.IO;
 using System.Xml.Serialization;
 using System.Windows.Forms;
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using SpeechCastMe;
 
 class UiRegressionTests
@@ -114,6 +121,114 @@ class UiRegressionTests
         FastParsingChecks();
         ToolbarChecks();
         SoundChecks();
+        SpeechChecks();
+    }
+
+    static T Pump<T>(Task<T> task, int milliseconds = 15000)
+    {
+        var watch = Stopwatch.StartNew();
+        while (!task.IsCompleted && watch.ElapsedMilliseconds < milliseconds) { Application.DoEvents(); Thread.Sleep(5); }
+        if (!task.IsCompleted) throw new Exception("timed out");
+        return task.Result;
+    }
+
+    static bool SpeakAndWait(SpeechEngine engine, string text, int milliseconds = 15000)
+    {
+        bool done = false, cancelled = false;
+        EventHandler<SpeechCompletedArgs> handler = (s, e) => { done = true; cancelled = e.Cancelled; };
+        engine.SpeakCompleted += handler;
+        engine.SpeakAsync(text);
+        var watch = Stopwatch.StartNew();
+        while (!done && watch.ElapsedMilliseconds < milliseconds) { Application.DoEvents(); Thread.Sleep(5); }
+        engine.SpeakCompleted -= handler;
+        return done && !cancelled;
+    }
+
+    // Minimal VOICEVOX-compatible engine: /speakers, /audio_query, /synthesis.
+    static void ServeFakeVoicevox(TcpListener listener, List<string> requests)
+    {
+        byte[] wav = File.ReadAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media", "Windows Ding.wav"));
+        try
+        {
+            while (true)
+            {
+                using (var client = listener.AcceptTcpClient())
+                using (var stream = client.GetStream())
+                {
+                    var head = new List<byte>();
+                    while (head.Count < 4 || Encoding.ASCII.GetString(head.Skip(head.Count - 4).ToArray()) != "\r\n\r\n") { int b = stream.ReadByte(); if (b < 0) break; head.Add((byte)b); }
+                    string header = Encoding.UTF8.GetString(head.ToArray());
+                    int length = 0;
+                    foreach (string line in header.Split(new[] { "\r\n" }, StringSplitOptions.None))
+                        if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) length = int.Parse(line.Substring(15).Trim());
+                    var body = new byte[length];
+                    for (int read = 0; read < length; ) read += stream.Read(body, read, length - read);
+                    string path = header.Split(' ')[1];
+                    lock (requests) requests.Add(path + " " + Encoding.UTF8.GetString(body));
+                    byte[] content; string type = "application/json; charset=utf-8";
+                    if (path.StartsWith("/speakers")) content = Encoding.UTF8.GetBytes("[{\"name\":\"ずんだもん\",\"speaker_uuid\":\"z\",\"styles\":[{\"name\":\"ノーマル\",\"id\":3},{\"name\":\"ハミング\",\"id\":3001,\"type\":\"sing\"}]}]");
+                    else if (path.StartsWith("/audio_query")) content = Encoding.UTF8.GetBytes("{\"accent_phrases\":[],\"speedScale\":1.0,\"pitchScale\":0.0,\"volumeScale\":1.0,\"outputSamplingRate\":24000}");
+                    else { content = wav; type = "audio/wav"; }
+                    byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: " + type + "\r\nContent-Length: " + content.Length + "\r\nConnection: close\r\n\r\n");
+                    stream.Write(response, 0, response.Length);
+                    stream.Write(content, 0, content.Length);
+                }
+            }
+        }
+        catch (Exception) { } // listener stopped
+    }
+
+    static void SpeechChecks()
+    {
+        SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+        using (var engine = new SpeechEngine())
+        {
+            var names = engine.VoiceNames;
+            Check(names.Contains("Microsoft Haruka Desktop") && names.Contains("Microsoft Ayumi") && names.Contains("Microsoft Ichiro") && !names.Contains("Microsoft Haruka"), "Windows built-in voices are listed with SAPI voices without a duplicate Haruka");
+            Check(names.IndexOf("Microsoft Haruka Desktop") < names.IndexOf("Microsoft Ayumi"), "SAPI voices stay first so Haruka remains the default");
+            engine.Volume = 0;
+            Check(engine.SelectVoice("Microsoft Ayumi") && SpeakAndWait(engine, "テストです"), "Windows built-in voice speaks and completes");
+            Check(engine.SelectVoice("Microsoft Haruka Desktop") && SpeakAndWait(engine, "テストです"), "SAPI voice still speaks and completes");
+        }
+        var saved = SpeechEngine.EngineEndpoints.ToList();
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var requests = new List<string>();
+        new Thread(() => ServeFakeVoicevox(listener, requests)) { IsBackground = true }.Start();
+        SpeechEngine.EngineEndpoints.Clear();
+        SpeechEngine.EngineEndpoints.Add(new KeyValuePair<string, string>("VOICEVOX", "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port));
+        try
+        {
+            using (var engine = new SpeechEngine())
+            {
+                string zundamon = "VOICEVOX:ずんだもん（ノーマル）";
+                Check(Pump(engine.RefreshEngineVoicesAsync()) && engine.VoiceNames.Contains(zundamon) && !engine.VoiceNames.Any(n => n.Contains("ハミング")), "running VOICEVOX voices are discovered with talk styles only");
+                Check(!Pump(engine.RefreshEngineVoicesAsync()), "unchanged VOICEVOX voice list reports no change");
+                engine.Volume = 0; engine.Rate = 10;
+                int progress = 0;
+                engine.SpeakProgress += (s, e) => progress = Math.Max(progress, e.CharacterPosition);
+                Check(engine.SelectVoice(zundamon) && SpeakAndWait(engine, "ずんだもんなのだ") && progress == 8, "VOICEVOX voice synthesizes plays and advances the caption");
+                string synthesis;
+                lock (requests) synthesis = requests.Last(r => r.StartsWith("/synthesis"));
+                Check(synthesis.StartsWith("/synthesis?speaker=3 ") && synthesis.Contains("\"speedScale\":2"), "speaking rate is sent as VOICEVOX speed");
+                int completions = 0; bool cancelled = false;
+                engine.SpeakCompleted += (s, e) => { completions++; cancelled = e.Cancelled; };
+                engine.SpeakAsync("止めるのだ");
+                engine.SpeakAsyncCancelAll();
+                for (int i = 0; i < 100; i++) { Application.DoEvents(); Thread.Sleep(5); }
+                Check(completions == 1 && cancelled && engine.State == System.Speech.Synthesis.SynthesizerState.Ready, "cancelling a VOICEVOX request completes once as cancelled");
+                listener.Stop();
+                string failure = null;
+                engine.Failed += message => failure = message;
+                Check(SpeakAndWait(engine, "落ちたのだ") && failure != null && failure.Contains("Windowsの音声"), "VOICEVOX failure falls back to the Windows voice");
+            }
+        }
+        finally
+        {
+            listener.Stop();
+            SpeechEngine.EngineEndpoints.Clear();
+            SpeechEngine.EngineEndpoints.AddRange(saved);
+        }
     }
 
     static object Script(WebBrowser browser, string name, params object[] args) { return browser.Document.InvokeScript(name, args); }

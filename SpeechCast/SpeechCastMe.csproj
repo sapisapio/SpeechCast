@@ -11,6 +11,11 @@
     <RootNamespace>SpeechCastMe</RootNamespace>
     <AssemblyName>SpeechCastSP</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <WindowsKitsUnion>$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata</WindowsKitsUnion>
+    <WindowsUnionMetadata Condition=" '$(WindowsUnionMetadata)' == '' And Exists('$(WindowsKitsUnion)\10.0.26100.0\Windows.winmd') ">$(WindowsKitsUnion)\10.0.26100.0\Windows.winmd</WindowsUnionMetadata>
+    <WindowsUnionMetadata Condition=" '$(WindowsUnionMetadata)' == '' And Exists('$(WindowsKitsUnion)\10.0.22621.0\Windows.winmd') ">$(WindowsKitsUnion)\10.0.22621.0\Windows.winmd</WindowsUnionMetadata>
+    <WindowsUnionMetadata Condition=" '$(WindowsUnionMetadata)' == '' And Exists('$(WindowsKitsUnion)\10.0.22000.0\Windows.winmd') ">$(WindowsKitsUnion)\10.0.22000.0\Windows.winmd</WindowsUnionMetadata>
+    <WindowsUnionMetadata Condition=" '$(WindowsUnionMetadata)' == '' And Exists('$(WindowsKitsUnion)\10.0.19041.0\Windows.winmd') ">$(WindowsKitsUnion)\10.0.19041.0\Windows.winmd</WindowsUnionMetadata>
     <FileAlignment>512</FileAlignment>
     <ApplicationIcon>app3.ico</ApplicationIcon>
     <FileUpgradeFlags>
@@ -123,6 +128,16 @@
     <Reference Include="System.Speech">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
+    <!-- Windows 10+ built-in voices (Windows.Media.SpeechSynthesis). Building needs
+         the Windows 10/11 SDK metadata; the app itself needs no extra file. -->
+    <Reference Include="Windows">
+      <HintPath>$(WindowsUnionMetadata)</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Runtime.WindowsRuntime">
+      <HintPath>$(MSBuildFrameworkToolsPath32)System.Runtime.WindowsRuntime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
@@ -204,6 +219,9 @@
     <Compile Include="JpnknFastMessage.cs" />
     <Compile Include="JpnknFastClient.cs" />
     <Compile Include="FormMain.Fast.cs" />
+    <Compile Include="FormMain.Voices.cs" />
+    <Compile Include="OneCoreVoices.cs" />
+    <Compile Include="SpeechEngine.cs" />
     <Compile Include="NotificationSoundPlayer.cs" />
     <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />

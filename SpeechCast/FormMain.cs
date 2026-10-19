@@ -50,15 +50,16 @@ namespace SpeechCastMe
             InitializeComponent();
             InitializeReaderUi();
 
-            // インストール済みSSAPI5のボイスリストを取得
-            foreach (InstalledVoice voice in synthesizer.GetInstalledVoices())
+            // インストール済みのボイスリストを取得（SAPI5＋Windows内蔵の新しい音声）
+            foreach (string voiceName in synthesizer.VoiceNames)
             {
-                toolStripComboBoxSelectVoice.Items.Add(voice.VoiceInfo.Name);
+                toolStripComboBoxSelectVoice.Items.Add(voiceName);
             }
 
             // 音声再生関連のコールバック関数の登録
-            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(synthesizer_SpeakProgress);
-            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
+            synthesizer.SpeakProgress += new EventHandler<SpeechProgressArgs>(synthesizer_SpeakProgress);
+            synthesizer.SpeakCompleted += new EventHandler<SpeechCompletedArgs>(synthesizer_SpeakCompleted);
+            InitializeVoiceEngines();
 
             // 生成されたインスタンスを変数へ代入(別フォームからの操作のため)
             Instance = this;
@@ -142,7 +143,7 @@ namespace SpeechCastMe
         }
         private bool WarningNextThread = false;
         // 読み上げ完了時の処理
-        void synthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e)
+        void synthesizer_SpeakCompleted(object sender, SpeechCompletedArgs e)
         {
             speakingCompletedTime = System.DateTime.Now;
             isSpeaking = false;           
@@ -196,7 +197,7 @@ namespace SpeechCastMe
         System.DateTime gettingWebTime;
 
         
-        void synthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
+        void synthesizer_SpeakProgress(object sender, SpeechProgressArgs e)
         {
             
                 string speackStr;
@@ -238,7 +239,7 @@ namespace SpeechCastMe
 
         }
 
-        public SpeechSynthesizer synthesizer = new SpeechSynthesizer();
+        public SpeechEngine synthesizer = new SpeechEngine();
 
         private void toolStripComboBoxSelectVoice_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -248,7 +249,8 @@ namespace SpeechCastMe
             {
                 string voiceName = toolStripComboBoxSelectVoice.Items[idx].ToString();
                 synthesizer.SelectVoice(voiceName);
-                UserConfig.VoiceName = voiceName;
+                // 起動前のVOICEVOX等の声は、一覧に出るまで保存値を残す
+                if (!syncingVoiceList) UserConfig.VoiceName = voiceName;
             }
         }
 
@@ -1859,19 +1861,8 @@ namespace SpeechCastMe
             }
 
 
-            int selectedIndex = 0;
-            int idx = toolStripComboBoxSelectVoice.Items.IndexOf(UserConfig.VoiceName);
-            if (idx >= 0)
-            {
-                selectedIndex = idx;
-            }
-
-            if (selectedIndex < toolStripComboBoxSelectVoice.Items.Count)
-            {
-                toolStripComboBoxSelectVoice.SelectedIndex = selectedIndex;
-            }
-
-            selectedIndex = 0;
+            SyncVoiceList();
+            RefreshEngineVoices();
             toolStripTrackBarVoiceVolume.Value = UserConfig.SpeakingVolume;
             toolStripTrackBarPlayVolume.Value = UserConfig.PlayVolume;
             synthesizer.Volume = UserConfig.SpeakingVolume;
