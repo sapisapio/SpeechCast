@@ -3,22 +3,30 @@
 <html><head><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta charset="utf-8">
 <style>
 html,body{margin:0;padding:0}
-body{background:#f8fafc;color:#243247;font-family:Meiryo,sans-serif;font-size:16px;line-height:1.55}
-#resArea{padding:0 10px}
-.comment{padding:7px 0;border-bottom:1px solid #dce3eb;word-wrap:break-word;overflow-wrap:break-word}
+body{background:#f8fafc;color:#243247;font-family:'MS PGothic',sans-serif;font-size:16px;line-height:1.55}
+#resArea{padding:0}
+.comment{padding:4px 8px;border-bottom:1px solid #d3dce7;word-wrap:break-word;overflow-wrap:break-word}
+body.no-lines .comment{border-bottom-color:transparent}
 .anchor{display:block;height:0}
 .source-thread{font-size:.75em;margin-right:7px}
-.meta{font-size:.8em;color:#66758b}
+.meta{font-size:1em;color:#66758b}.two-line .meta{font-size:.95em}
 .field{display:none;margin-right:7px}
 .show-number .number,.show-name .author,.show-date .date,.show-time .time,.show-id .identity{display:inline}
 .body{white-space:pre-wrap}
-.two-line .meta{display:block;line-height:1.5;margin-bottom:2px}
+/* Two-line layout: a grey header bar like the classic 2ch view, body slightly indented, tight spacing. */
+.two-line .meta{display:block;line-height:1.4;margin:0 -8px 2px;padding:1px 8px;background:rgba(0,0,0,.15)}.two-line .body{display:block;padding-left:1.2em}body.dark.two-line .meta{background:rgba(255,255,255,.12)}
 .no-fields .meta{display:none}
 a{color:#2877b7;text-decoration:none}a:hover{text-decoration:underline}
 body.dark{background:#171d26;color:#edf1f7}
 body.dark .comment{border-color:#323c4b}
 body.dark .meta{color:#a8b7ca}body.dark a{color:#82bbfa}
 body.paper{background:#f5f0e6;color:#3f3a32}body.paper .comment{border-color:#ded5c5}
+.number{color:#0000ff;text-decoration:underline}.number.ref1{color:#800080}.number.ref3{color:#ff0000}
+.author{color:#008000}.author.mail{color:#0000ff}.author.sage{color:#800080}
+.date,.time{color:#800080}.identity{color:#000}.identity.id2{color:#0000ff}.identity.id5{color:#ff0000}.identity .count{margin-left:2px}
+body.dark .number{color:#7aa7ff}body.dark .number.ref1{color:#d69cff}body.dark .number.ref3{color:#ff7070}
+body.dark .author{color:#6fd27d}body.dark .author.mail{color:#7aa7ff}body.dark .author.sage{color:#d69cff}
+body.dark .date,body.dark .time{color:#d69cff}body.dark .identity{color:#edf1f7}body.dark .identity.id2{color:#7aa7ff}body.dark .identity.id5{color:#ff7070}
 .comment{cursor:pointer}.comment.current{background:#fff1b8;box-shadow:inset 3px 0 0 #deb234}body.dark .comment.current{background:#4a3f16}body.paper .comment.current{background:#f3e2a6}
 </style>
 <script>
@@ -33,22 +41,34 @@ function anchorSnapshot(){
  return {node:null,offset:0,top:top};
 }
 function restoreAnchor(saved){scrollToY(saved.node?scrollTop()+saved.node.getBoundingClientRect().top-saved.offset:saved.top);}
-function addRes(res){var top=scrollTop(),node=document.createElement('div');node.innerHTML=res;document.getElementById('resArea').appendChild(node);if(currentRes)markCurrent();scrollToY(top);}
+function addRes(res){var top=scrollTop(),node=document.createElement('div');node.innerHTML=res;document.getElementById('resArea').appendChild(node);countRes(node);if(currentRes)markCurrent();scrollToY(top);}
+// Reply and per-ID post counts colour numbers (blue / purple 1+ / red 3+) and IDs (2+ / 5+).
+var refs={},ids={},numberEls={},idEls={};
+function hasClass(e,c){return (' '+e.className+' ').indexOf(' '+c+' ')>=0;}
+function setLevel(e,base,level){e.className=base+(level?' '+level:'');}
+function paintRef(k){var e=numberEls[k];if(!e)return;var n=refs[k]||0;setLevel(e,'field number',n>=3?'ref3':n>=1?'ref1':'');}
+function paintId(k){var n=ids[k]||0,list=idEls[k]||[];for(var i=0;i<list.length;i++){setLevel(list[i],'field identity',n>=5?'id5':n>=2?'id2':'');var c=list[i].getElementsByTagName('span');if(c.length)c[0].innerHTML='('+n+')';}}
+function countRes(node){var a=node.getElementsByTagName('a'),s=node.getElementsByTagName('span'),i,k;
+ for(i=0;i<s.length;i++){k=s[i].getAttribute('data-key');if(!k)continue;
+  if(hasClass(s[i],'number')){numberEls[k]=s[i];paintRef(k);}
+  else if(hasClass(s[i],'identity')){ids[k]=(ids[k]||0)+1;(idEls[k]=idEls[k]||[]).push(s[i]);paintId(k);}}
+ for(i=0;i<a.length;i++)if(a[i].className==='reply'){k=a[i].getAttribute('data-key');refs[k]=(refs[k]||0)+1;paintRef(k);}}
+function recount(){refs={};ids={};numberEls={};idEls={};var c=document.getElementById('resArea').childNodes;for(var i=0;i<c.length;i++)if(c[i].nodeType===1)countRes(c[i]);}
 var currentRes=0;
 function markCurrent(){var a=document.getElementsByName('res'+currentRes);if(a.length&&a[0].parentNode.className.indexOf(' current')<0)a[0].parentNode.className+=' current';return a.length?a[0].parentNode:null;}
 function setCurrent(n,follow){var old=document.getElementsByClassName('current');for(var i=old.length-1;i>=0;i--)old[i].className=old[i].className.replace(' current','');currentRes=n;var c=markCurrent();if(!c||!follow)return;var r=c.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;if(r.top<0||r.bottom>h)scrollToY(scrollTop()+r.top-Math.round(h/3));}
 function commentClicked(e){e=e||window.event;var t=e.target||e.srcElement;for(var n=t;n&&n!==document.body;n=n.parentNode){if(n.tagName==='A'&&n.className!=='anchor')return;if(n.className&&(' '+n.className+' ').indexOf(' comment ')>=0){var sel=window.getSelection?String(window.getSelection()):'';if(sel.length)return;var a=n.getElementsByTagName('a');for(var i=0;i<a.length;i++)if(a[i].className==='anchor'){window.location.href='http://res/read/'+a[i].name.substring(3);return;}return;}}}
 if(document.addEventListener)document.addEventListener('click',commentClicked,false);else document.attachEvent('onclick',commentClicked);
-function trimRes(count){var area=document.getElementById('resArea'),saved=anchorSnapshot();for(var i=0;i<count&&area.firstChild;i++)area.removeChild(area.firstChild);var anchors=area.getElementsByTagName('a'),n=0;for(var j=0;j<anchors.length;j++)if(anchors[j].className==='anchor')anchors[j].setAttribute('name','res'+(++n));if(saved.node&&area.contains(saved.node))restoreAnchor(saved);else scrollToY(0);}
-function clearRes(){document.getElementById('resArea').innerHTML='';scrollToY(0);}
+function trimRes(count){var area=document.getElementById('resArea'),saved=anchorSnapshot();for(var i=0;i<count&&area.firstChild;i++)area.removeChild(area.firstChild);var anchors=area.getElementsByTagName('a'),n=0;for(var j=0;j<anchors.length;j++)if(anchors[j].className==='anchor')anchors[j].setAttribute('name','res'+(++n));recount();if(saved.node&&area.contains(saved.node))restoreAnchor(saved);else scrollToY(0);}
+function clearRes(){document.getElementById('resArea').innerHTML='';refs={};ids={};numberEls={};idEls={};scrollToY(0);}
 function setZoom(value){var area=document.getElementById('resArea'),next=String(Math.max(.5,Math.min(3,Number(value))));if(String(area.style.zoom)===next)return;var saved=anchorSnapshot();area.style.zoom=next;restoreAnchor(saved);}
 function getResTop(number){var nodes=document.getElementsByName('res'+number);return nodes.length?Math.round(nodes[0].getBoundingClientRect().top+scrollTop()):scrollTop();}
-function setAppearance(layout,theme,background,fontSize,fontName,number,name,date,time,id){
+function setAppearance(layout,theme,background,fontSize,fontName,number,name,date,time,id,lines){
  var saved=anchorSnapshot(),fields=(number?' show-number':'')+(name?' show-name':'')+(date?' show-date':'')+(time?' show-time':'')+(id?' show-id':'');
- document.body.className=(layout==='named'||layout==='two'?'two-line':'one-line')+' '+theme+fields+(fields?'':' no-fields');
+ document.body.className=(layout==='named'||layout==='two'?'two-line':'one-line')+' '+theme+fields+(fields?'':' no-fields')+(lines===false?' no-lines':'');
  document.body.style.backgroundColor=background||'';
  document.body.style.fontSize=Math.max(10,Math.min(40,Number(fontSize)||16))+'px';
- document.body.style.fontFamily=fontName||'Meiryo';
+ document.body.style.fontFamily=fontName?"'"+fontName+"',sans-serif":'';
  restoreAnchor(saved);
 }
 </script></head><body class="one-line light show-number"><div id="resArea"></div></body></html>

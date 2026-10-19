@@ -55,6 +55,24 @@ namespace SpeechCastMe
             }
         }
 
+        // The comment view (IE) cannot see a GDI+ private font or load a file font
+        // from its about:blank page, but it accepts the font as a data URI.
+        internal static string FontFaceStyle()
+        {
+            try
+            {
+                using (Stream stream = typeof(BundledFont).Assembly.GetManifestResourceStream(ResourceName))
+                using (var memory = new MemoryStream())
+                {
+                    if (stream == null) return "";
+                    stream.CopyTo(memory);
+                    return "<style>@font-face{font-family:'" + FamilyName + "';src:url(data:font/ttf;base64,"
+                        + Convert.ToBase64String(memory.ToArray()) + ") format('truetype')}</style>";
+                }
+            }
+            catch (Exception) { return ""; }
+        }
+
         // Settings store the English family name; GDI+ reports a localized one.
         internal static FontFamily Resolve(string name)
         {

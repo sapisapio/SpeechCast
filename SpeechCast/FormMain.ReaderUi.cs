@@ -8,11 +8,6 @@ namespace SpeechCastMe
     public partial class FormMain
     {
         private ToolStrip readerToolbar;
-        private bool presentation;
-        private bool previousListCollapsed;
-        private bool previousCaptionCollapsed;
-        private FormBorderStyle previousBorder;
-        private ToolStripMenuItem presentationMenu;
         private readonly bool IsDesignPreview = Environment.GetEnvironmentVariable("SPEECHCAST_UI_PREVIEW") == "1";
 
         private void InitializeReaderUi()
@@ -72,6 +67,10 @@ namespace SpeechCastMe
             AddAppearanceItem(appearance, "1行モード（項目と本文を横並び）", "one", null);
             AddAppearanceItem(appearance, "2行モード（項目の下に本文）", "two", null);
             appearance.DropDownItems.Add("表示項目・フォント…", null, delegate { ShowReaderAppearance(); });
+            var separators = new ToolStripMenuItem("レスの区切り線");
+            separators.Click += delegate { if (UserConfig == null) return; UserConfig.CommentSeparators = !UserConfig.CommentSeparators; ApplyReaderAppearance(); };
+            appearance.DropDownOpening += delegate { separators.Checked = UserConfig != null && UserConfig.CommentSeparators; };
+            appearance.DropDownItems.Add(separators);
             appearance.DropDownItems.Add(new ToolStripSeparator());
             AddAppearanceItem(appearance, "明るい背景", null, "light");
             AddAppearanceItem(appearance, "暗い背景", null, "dark");
@@ -90,9 +89,7 @@ namespace SpeechCastMe
                 }
             });
             appearance.DropDownItems.Add(new ToolStripSeparator());
-            presentationMenu = new ToolStripMenuItem("コメントだけ表示  (F11)");
-            presentationMenu.Click += delegate { TogglePresentation(); };
-            appearance.DropDownItems.Add(presentationMenu);
+            appearance.DropDownItems.Add("配信コメント  (F11)", null, delegate { ToggleStreamMode(); });
             var autoScroll = new ToolStripMenuItem("自動送り");
             autoScroll.Click += delegate { toolStripButtonAutoScroll.PerformClick(); };
             appearance.DropDownOpening += delegate { autoScroll.Checked = UserConfig != null && UserConfig.AutoAdvance; };
@@ -100,6 +97,12 @@ namespace SpeechCastMe
             appearance.DropDownItems.Add("レス一覧の表示切替", null, delegate { toolStripButtonListToggle.PerformClick(); });
             appearance.DropDownItems.Add("代替字幕を開く", null, delegate { openResCaptionForm(); });
             menuStrip1.Items.Add(appearance);
+            InitializeOpenBoardUi();
+            // Stream comments: a separate transparent window for OBS window capture.
+            streamButton = new ToolStripButton("配信コメント") { Name = "streamModeButton", Alignment = ToolStripItemAlignment.Right,
+                DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信用のコメント窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）  F11" };
+            streamButton.Click += delegate { ToggleStreamMode(); };
+            menuStrip1.Items.Add(streamButton);
 
             foreach (var strip in new ToolStrip[] { myToolStripVoice, myToolStripPlay, myToolStripBrowser, myToolStripUrl, menuStrip1 })
             {
@@ -141,7 +144,7 @@ namespace SpeechCastMe
             toolStripTextBoxThreadKeyword.ToolTipText = "次スレキーワード";
             webBrowser.IsWebBrowserContextMenuEnabled = false;
             var context = new ContextMenuStrip();
-            context.Items.Add("操作パネルを表示 / 非表示  (F11)", null, delegate { TogglePresentation(); });
+            context.Items.Add("配信コメント  (F11)", null, delegate { ToggleStreamMode(); });
             context.Items.Add("最新レスへ", null, delegate { toolStripButtonMoveBottom.PerformClick(); });
             context.Items.Add("表示項目・フォント…", null, delegate { ShowReaderAppearance(); });
             webBrowser.ContextMenuStrip = context;
@@ -204,7 +207,7 @@ namespace SpeechCastMe
             webBrowser.Document.InvokeScript("setAppearance", new object[] {
                 UserConfig.CommentLayout ?? "one", UserConfig.CommentTheme ?? "light", UserConfig.CommentBackground ?? "",
                 UserConfig.CommentFontSize, UserConfig.CommentFontName,
-                UserConfig.CommentShowNumber, UserConfig.CommentShowName, UserConfig.CommentShowDate, UserConfig.CommentShowTime, UserConfig.CommentShowID });
+                UserConfig.CommentShowNumber, UserConfig.CommentShowName, UserConfig.CommentShowDate, UserConfig.CommentShowTime, UserConfig.CommentShowID, UserConfig.CommentSeparators });
             foreach (Response response in responses) response.ScrollY = -1;
         }
 
@@ -220,44 +223,23 @@ namespace SpeechCastMe
             if (UserConfig != null && UserConfig.CommentLayout == "named") { UserConfig.CommentLayout = "two"; UserConfig.CommentShowName = true; }
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setZoom", new object[] { 1 });
             ApplyReaderAppearance();
+            BeginInvoke(new Action(OpenLastOnStartup));
         }
 
         private void SetReaderChrome()
         {
-            myToolStripVoice.Visible = !presentation;
-            myToolStripPlay.Visible = !presentation;
+            myToolStripVoice.Visible = true;
+            myToolStripPlay.Visible = true;
             myToolStripBrowser.Visible = false;
-            readerToolbar.Visible = !presentation;
-            myToolStripUrl.Visible = !presentation;
-            menuStrip1.Visible = !presentation;
-            statusStrip1.Visible = !presentation;
-        }
-
-        private void TogglePresentation()
-        {
-            presentation = !presentation;
-            if (presentation)
-            {
-                previousListCollapsed = splitContainer1.Panel1Collapsed;
-                previousCaptionCollapsed = splitContainerResCaption.Panel2Collapsed;
-                previousBorder = FormBorderStyle;
-                splitContainer1.Panel1Collapsed = true;
-                splitContainerResCaption.Panel2Collapsed = true;
-                FormBorderStyle = FormBorderStyle.None;
-            }
-            else
-            {
-                FormBorderStyle = previousBorder;
-                splitContainer1.Panel1Collapsed = previousListCollapsed;
-                splitContainerResCaption.Panel2Collapsed = previousCaptionCollapsed;
-            }
-            presentationMenu.Checked = presentation;
-            SetReaderChrome();
+            readerToolbar.Visible = true;
+            myToolStripUrl.Visible = true;
+            menuStrip1.Visible = true;
+            statusStrip1.Visible = true;
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (keyData == Keys.F11 || (presentation && keyData == Keys.Escape)) { TogglePresentation(); return true; }
+            if (keyData == Keys.F11) { ToggleStreamMode(); return true; }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 

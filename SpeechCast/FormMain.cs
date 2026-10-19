@@ -71,6 +71,8 @@ namespace SpeechCastMe
             this.webBrowser.Navigating += new WebBrowserNavigatingEventHandler(webBrowser_Navigating);
             // JavaScriptでの差分取得用HTMLをセット
             string html = SpeechCastMe.Properties.Resources.resView.ToString();
+            // Make the bundled font available to the comment view as well.
+            html = html.Replace("</head>", BundledFont.FontFaceStyle() + "</head>");
             webBrowser.DocumentText = html;
         }
 
@@ -1505,6 +1507,7 @@ namespace SpeechCastMe
         private void timer_Tick(object sender, EventArgs e)
         {
             UpdateUnreadStatus();
+            ClearHighlightWhenIdle(System.DateTime.Now);
             diff = System.DateTime.Now - speakingCompletedTime;
             diffWeb = System.DateTime.Now - gettingWebTime;
             if (CurrentResNumber != UserConfig.endThreadWarningResCount) endThreadWarning = false;
@@ -1893,6 +1896,7 @@ namespace SpeechCastMe
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            ExitStreamMode(); // saves the stream window bounds before settings are written
             ClearFastSession();
             notificationPlayer.Dispose();
             if (IsDesignPreview)

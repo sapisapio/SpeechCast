@@ -271,19 +271,24 @@ namespace SpeechCastMe
             // UI refresh, 2026-10-18: encode board text before building display markup.
             content = HttpUtility.HtmlEncode(ConvertToText(content)).Replace("\r\n", "\n");
             content = toHtmlRegexUrl.Replace(content, toTextMatchEvalGroupResAnchor);
-            content = string.IsNullOrEmpty(SourceThreadUrl)
-                ? toHtmlRegexGtGt.Replace(content, toTextMatchEvalGroupAddLink)
-                : toHtmlRegexGtGt.Replace(content, m => "<a href=\"" + HttpUtility.HtmlAttributeEncode(SourceThreadUrl) + m.Groups[1].Value + "\">" + m.Value + "</a>");
+            // data-key identifies a reply within its thread, so the view can count
+            // replies and posts per ID (board feeds mix threads).
+            string thread = SourceThreadUrl ?? "";
+            content = toHtmlRegexGtGt.Replace(content, m => "<a class=\"reply\" data-key=\"" + HttpUtility.HtmlAttributeEncode(thread + m.Groups[1].Value)
+                + "\" href=\"" + HttpUtility.HtmlAttributeEncode((string.IsNullOrEmpty(SourceThreadUrl) ? AnchorUrl : SourceThreadUrl) + m.Groups[1].Value) + "\">" + m.Value + "</a>");
+            string mail = MailAddress ?? "";
+            string authorClass = mail.Length == 0 ? "" : mail.IndexOf("sage", StringComparison.OrdinalIgnoreCase) >= 0 ? " sage" : " mail";
             string timestamp = DateTime ?? "";
             Match date = Regex.Match(timestamp, @"\d{4}/\d{1,2}/\d{1,2}(?:[（(][^）)]*[）)])?");
-            Match time = Regex.Match(timestamp, @"\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?");
+            Match time = Regex.Match(timestamp, @"\d{1,2}:\d{2}"); // to the minute
             return "<div class=\"comment\"><a class=\"anchor\" name=\"res" + Number + "\"></a>"
                 + (string.IsNullOrEmpty(SourceLabel) ? "" : "<a class=\"source-thread\" href=\"" + HttpUtility.HtmlAttributeEncode(SourceThreadUrl) + "\">" + HttpUtility.HtmlEncode(SourceLabel) + "</a> ")
-                + "<span class=\"meta\"><span class=\"field number\">" + DisplayNumber + ":</span>"
-                + "<span class=\"field author\">" + HttpUtility.HtmlEncode(Name) + "</span>"
+                + "<span class=\"meta\"><span class=\"field number\" data-key=\"" + HttpUtility.HtmlAttributeEncode(thread + DisplayNumber) + "\">" + DisplayNumber + ":</span>"
+                + "<span class=\"field author" + authorClass + "\">" + HttpUtility.HtmlEncode(Name) + "</span>"
                 + "<span class=\"field date\">" + HttpUtility.HtmlEncode(date.Value) + "</span>"
                 + "<span class=\"field time\">" + HttpUtility.HtmlEncode(time.Value) + "</span>"
-                + "<span class=\"field identity\">" + (string.IsNullOrEmpty(ID) ? "" : "ID:" + HttpUtility.HtmlEncode(ID)) + "</span></span>"
+                + (string.IsNullOrEmpty(ID) ? "<span class=\"field identity\"></span></span>"
+                    : "<span class=\"field identity\" data-key=\"" + HttpUtility.HtmlAttributeEncode(thread + "|" + ID) + "\">ID:" + HttpUtility.HtmlEncode(ID) + "<span class=\"count\"></span></span></span>")
                 + "<span class=\"body\">" + content + "</span></div>";
         }
 

@@ -13,8 +13,14 @@ namespace SpeechCastMe
         // ClearType colour fringes, or unhinted vector fill on small Japanese counters.
         internal static void Draw(Graphics target, Rectangle rectangle, string text, CaptionFont style, bool aaMode)
         {
-            if (rectangle.Width < 1 || rectangle.Height < 1 || string.IsNullOrEmpty(text)) return;
             rectangle.Offset(FormMain.UserConfig.CaptionIndentLeftPadding, FormMain.UserConfig.CaptionIndentTopPadding);
+            DrawOutlined(target, rectangle, text, style, aaMode);
+        }
+
+        // Outlined text with per-pixel alpha at an exact rectangle (no caption indent).
+        internal static void DrawOutlined(Graphics target, Rectangle rectangle, string text, CaptionFont style, bool aaMode)
+        {
+            if (rectangle.Width < 1 || rectangle.Height < 1 || string.IsNullOrEmpty(text)) return;
             int radius = Math.Max(0, Math.Min(12, style.BorderSize));
             int width = rectangle.Width + radius * 2, height = rectangle.Height + radius * 2;
             using (var mask = new Bitmap(width, height, PixelFormat.Format32bppArgb))
@@ -47,6 +53,13 @@ namespace SpeechCastMe
                 left = Math.Max(0, left - radius); right = Math.Min(width - 1, right + radius);
                 top = Math.Max(0, top - radius); bottom = Math.Min(height - 1, bottom + radius);
                 float lineHeight = Math.Max(1, font.GetHeight(target));
+                // Outline coverage falls off over the last half pixel of the radius,
+                // so the outer edge of the border is antialiased instead of stepped.
+                int span = radius * 2 + 1;
+                var weights = new float[span * span];
+                for (int dy = -radius; dy <= radius; dy++)
+                    for (int dx = -radius; dx <= radius; dx++)
+                        weights[(dy + radius) * span + dx + radius] = Math.Max(0, Math.Min(1, radius + 0.5F - (float)Math.Sqrt(dx * dx + dy * dy)));
                 Color high = style.Colors.HighForeColor, low = style.Colors.LowForeColor, border = style.Colors.BorderColor;
                 for (int y = top; y <= bottom; y++)
                 {
@@ -63,8 +76,9 @@ namespace SpeechCastMe
                                 for (int dx = -radius; dx <= radius; dx++)
                                 {
                                     int xx = x + dx;
-                                    if (xx >= 0 && xx < width && dx * dx + dy * dy <= radius * radius)
-                                        outline = Math.Max(outline, pixels[yy * stride + xx * 4 + 3]);
+                                    float weight = weights[(dy + radius) * span + dx + radius];
+                                    if (xx >= 0 && xx < width && weight > 0)
+                                        outline = Math.Max(outline, (int)(pixels[yy * stride + xx * 4 + 3] * weight));
                                 }
                             }
                         float foregroundAlpha = coverage / 255F;

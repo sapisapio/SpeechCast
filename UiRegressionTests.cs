@@ -36,7 +36,7 @@ class UiRegressionTests
         Check(html.Contains("一行目\n二行目"), "line breaks retained");
         Check(html.Contains("href=\"https://example.com/path?q=1&amp;x=2\""), "HTTPS and query escaping retained");
         Check(html.Contains("href=\"http://res/719\""), "reply link retained");
-        Check(html.Contains("2026/10/18(日)</span>") && html.Contains("12:34:56.789</span>") && html.Contains("ID:id</span>"), "date time and ID emitted separately");
+        Check(html.Contains("2026/10/18(日)</span>") && html.Contains(">12:34</span>") && html.Contains("ID:id<span class=\"count\">"), "date time and ID emitted separately");
         string sample = html;
         type.GetMethod("SetRawText").Invoke(response, new object[] { "721<><><>today<>安全<img src=x onerror=alert(1)>テキスト<>title<>id" });
         html = (string)type.GetField("Html").GetValue(response);
@@ -270,6 +270,8 @@ class UiRegressionTests
             Check(FormMain.UserConfig.AutoAdvance != advancing && autoScroll.Checked == FormMain.UserConfig.AutoAdvance, "auto-advance button toggles the setting");
             autoScroll.PerformClick();
             ReadingChecks(form, browser);
+            StreamChecks(form);
+            OpenBoardChecks(form);
             foreach (var name in new[] { "toolStripButtonCaption", "toolStripButtonShowCaptionImmediately", "toolStripButtonBorder", "toolStripButtonOpenResCaptionForm", "toolStripButtonFirst", "toolStripButtonMoveBottom" })
             {
                 var button = (ToolStripButton)typeof(FormMain).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).GetValue(form);
@@ -455,6 +457,131 @@ class UiRegressionTests
         FastSnapshotChecks(form,browser,replies,apply);
     }
 
+    static void OpenBoardChecks(FormMain form)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var isJpnkn = typeof(FormMain).GetMethod("IsJpnknInput", BindingFlags.NonPublic | BindingFlags.Static);
+        Func<string, bool> jp = s => (bool)isJpnkn.Invoke(null, new object[] { s });
+        Check(jp("sapio") && jp("https://bbs.jpnkn.com/sapio/") && jp("https://bbs.jpnkn.com/test/read.cgi/sapio/123/") && !jp("https://jbbs.shitaraba.net/bbs/read.cgi/game/1/2/") && !jp(""), "jpnkn boards and threads are recognised for the mode choice");
+        Check(new UserConfig().OpenLastOnStartup, "the last board reopens on start-up by default");
+        Check(((MenuStrip)Field(form, "menuStrip1")).Items["openBoardMenu"] != null, "open board menu is on the menu bar");
+        bool preview = (bool)typeof(FormMain).GetField("IsDesignPreview", flags).GetValue(form);
+        typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, false);
+        bool jpnknShown = false, otherShown = false, otherHidden = false;
+        var timer = new System.Windows.Forms.Timer { Interval = 200 };
+        timer.Tick += delegate {
+            Form dialog = null;
+            foreach (Form open in Application.OpenForms) if (open.Text == "掲示板を開く") dialog = open;
+            if (dialog == null) return;
+            timer.Stop();
+            TextBox url = null; Panel panel = null; Label other = null;
+            foreach (Control c in dialog.Controls) { if (c is TextBox) url = (TextBox)c; else if (c is Panel) panel = (Panel)c; else if (c is Label && c.Text.StartsWith("板のURL")) other = (Label)c; }
+            url.Text = "https://bbs.jpnkn.com/sapio/";
+            jpnknShown = panel.Visible; otherHidden = !other.Visible;
+            url.Text = "https://jbbs.shitaraba.net/game/42885/";
+            otherShown = other.Visible && !panel.Visible;
+            dialog.DialogResult = DialogResult.Cancel;
+        };
+        timer.Start();
+        bool opened = (bool)typeof(FormMain).GetMethod("ShowOpenBoard", flags).Invoke(form, null);
+        timer.Dispose();
+        typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, preview);
+        Check(!opened && jpnknShown && otherHidden && otherShown, "the open dialog offers Fast or thread reading only for jpnkn");
+    }
+
+    static void StreamChecks(FormMain form)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var stream = (ToolStripItem)((MenuStrip)Field(form, "menuStrip1")).Items["streamModeButton"];
+        Check(stream is ToolStripButton && stream.Alignment == ToolStripItemAlignment.Right && stream.Text == "配信コメント", "stream comments button sits on the menu bar");
+        typeof(FormMain).GetMethod("ToggleStreamMode", flags).Invoke(form, null);
+        for (int i = 0; i < 40; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(10); }
+        var overlay = (Form)Field(form, "streamOverlay");
+        Check(overlay != null && overlay.Visible && form.Visible && ((ToolStripButton)stream).Checked, "stream comments open in their own window while the main window stays usable");
+        int exStyle = GetWindowLong(overlay.Handle, -20);
+        Check((exStyle & 0x80000) != 0 && (exStyle & 0x20) != 0, "stream window is layered and click-through");
+        Check((bool)overlay.GetType().GetProperty("LastUpdateSucceeded", flags).GetValue(overlay, null), "stream window accepts its per-pixel alpha frame");
+        var render = overlay.GetType().GetMethod("RenderFrame", BindingFlags.NonPublic | BindingFlags.Static);
+        var responses = Field(form, "responses");
+        using (var frame = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
+        {
+            int clear = 0, white = 0, black = 0;
+            for (int y = 0; y < frame.Height; y++) for (int x = 0; x < frame.Width; x++)
+            {
+                Color c = frame.GetPixel(x, y);
+                if (c.A == 0) clear++;
+                else if (c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240) white++;
+                else if (c.A == 255 && c.R < 20 && c.G < 20 && c.B < 20) black++;
+            }
+            Check(clear > frame.Width * frame.Height / 4 && white > 300 && black > 300, "comments render white with a black outline over a transparent background");
+            frame.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "stream-frame.png"), ImageFormat.Png);
+        }
+        bool showNumber = FormMain.UserConfig.CommentShowNumber;
+        FormMain.UserConfig.CommentShowNumber = false;
+        using (var without = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
+        {
+            FormMain.UserConfig.CommentShowNumber = true;
+            using (var with = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
+            {
+                bool differs = false;
+                for (int y = 0; y < 300 && !differs; y += 3) for (int x = 0; x < 400 && !differs; x += 3) differs = with.GetPixel(x, y) != without.GetPixel(x, y);
+                Check(differs, "stream window follows the comment field settings");
+            }
+        }
+        FormMain.UserConfig.CommentShowNumber = showNumber;
+        var defaults = new UserConfig();
+        Check(defaults.CommentFontName == "MS PGothic" && defaults.StreamFontName == "GenEi M Gothic v2 Black" && defaults.StreamFontSize == 24 && defaults.CommentFontSize == 12 && defaults.CommentShowTime && defaults.CommentSeparators, "comment view defaults to MS PGothic and stream comments to the bundled font");
+        string streamFont = FormMain.UserConfig.StreamFontName;
+        using (var bundled = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
+        {
+            FormMain.UserConfig.StreamFontName = "MS PGothic";
+            using (var other = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
+            {
+                bool differs = false;
+                for (int y = 0; y < 300 && !differs; y += 3) for (int x = 0; x < 400 && !differs; x += 3) differs = bundled.GetPixel(x, y) != other.GetPixel(x, y);
+                Check(differs, "stream comments use their own font setting");
+            }
+        }
+        FormMain.UserConfig.StreamFontName = streamFont;
+        overlay.Location = new Point(overlay.Left + 7, overlay.Top + 5);
+        var moved = overlay.Bounds;
+        typeof(FormMain).GetMethod("ToggleStreamMode", flags).Invoke(form, null);
+        Application.DoEvents();
+        Check(Field(form, "streamOverlay") == null && form.Visible && !((ToolStripButton)stream).Checked && FormMain.UserConfig.StreamOverlayBounds == moved, "closing stream comments remembers the window position");
+        var onScreen = new Rectangle(Screen.PrimaryScreen.WorkingArea.Left + 50, Screen.PrimaryScreen.WorkingArea.Top + 50, 420, 260);
+        FormMain.UserConfig.StreamOverlayBounds = onScreen;
+        for (int i = 0; i < 3; i++)
+        {
+            typeof(FormMain).GetMethod("ToggleStreamMode", flags).Invoke(form, null);
+            for (int j = 0; j < 20; j++) { Application.DoEvents(); System.Threading.Thread.Sleep(5); }
+            typeof(FormMain).GetMethod("ToggleStreamMode", flags).Invoke(form, null);
+        }
+        Check(FormMain.UserConfig.StreamOverlayBounds == onScreen, "reopening stream comments does not shrink the window");
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
+
+    static void ColourChecks(WebBrowser browser)
+    {
+        var type = typeof(FormMain).Assembly.GetType("SpeechCastMe.Response");
+        type.GetField("Style").SetValue(null, Enum.Parse(type.GetNestedType("BBSStyle"), "jbbs"));
+        Script(browser, "clearRes");
+        string[] raw = { "901<>名無し<>sage<>2026/10/19 12:00<>最初<>t<>AAA", "902<>名無し<><>2026/10/19 12:01<>&gt;&gt;901 だね<>t<>AAA",
+            "903<>名無し<>age<>2026/10/19 12:02<>&gt;&gt;901<>t<>BBB", "904<>名無し<><>2026/10/19 12:03<>&gt;&gt;901<>t<>CCC" };
+        foreach (string line in raw)
+        {
+            object response = Activator.CreateInstance(type, true);
+            type.GetMethod("SetRawText").Invoke(response, new object[] { line });
+            Script(browser, "addRes", (string)type.GetField("Html").GetValue(response));
+        }
+        Func<string, string> js = code => Convert.ToString(Script(browser, "eval", code));
+        Check(js("document.getElementsByClassName('number')[0].className").Contains("ref3") && js("document.getElementsByClassName('number')[1].className").IndexOf("ref") < 0, "reply numbers turn red after three replies and stay blue without any");
+        Check(js("document.getElementsByClassName('identity')[0].className").Contains("id2") && js("document.getElementsByClassName('identity')[0].innerText") == "ID:AAA(2)" && js("document.getElementsByClassName('identity')[2].innerText") == "ID:BBB(1)", "IDs show their post count and colour from two posts");
+        Check(!new UserConfig().CommentShowID, "IDs are hidden by default since most boards have none");
+        Check(js("document.getElementsByClassName('author')[0].className").Contains("sage") && js("document.getElementsByClassName('author')[2].className").Contains("mail") && js("document.getElementsByClassName('author')[1].className") == "field author", "names are coloured by mail field like the PeerCast viewer");
+        Script(browser, "clearRes");
+    }
+
     static void ReadingChecks(FormMain form, WebBrowser browser)
     {
         var flags = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -472,6 +599,15 @@ class UiRegressionTests
         int highlighted = 0;
         foreach (HtmlElement div in browser.Document.GetElementsByTagName("div")) if (isCurrent(div)) highlighted++;
         Check(current() == anchorOf(6) && highlighted == 1, "only one reply is highlighted at a time");
+        HtmlElement row = null;
+        foreach (HtmlElement anchor in browser.Document.GetElementsByTagName("a")) if (anchor.GetAttribute("name") == anchorOf(6)) row = anchor.Parent;
+        Check(row.OffsetRectangle.Left == 0 && Convert.ToInt32(Script(browser, "eval", "parseInt((document.getElementsByClassName('current')[0].currentStyle||{}).paddingLeft,10)")) >= 8, "highlight bar sits at the row's left edge, clear of the number");
+        FormMain.UserConfig.CommentSeparators = false;
+        typeof(FormMain).GetMethod("ApplyReaderAppearance", flags).Invoke(form, null);
+        bool noLines = ((string)Script(browser, "eval", "document.body.className")).Contains("no-lines");
+        FormMain.UserConfig.CommentSeparators = true;
+        typeof(FormMain).GetMethod("ApplyReaderAppearance", flags).Invoke(form, null);
+        Check(noLines && !((string)Script(browser, "eval", "document.body.className")).Contains("no-lines"), "reply separator lines can be turned off and on");
         HtmlElement target = null;
         foreach (HtmlElement anchor in browser.Document.GetElementsByTagName("a")) if (anchor.GetAttribute("name") == anchorOf(9)) target = anchor.Parent;
         bool preview = (bool)typeof(FormMain).GetField("IsDesignPreview", flags).GetValue(form);
@@ -493,6 +629,20 @@ class UiRegressionTests
         Check(unread.Available && unread.Text == "未読 " + (count - 9), "with auto-advance off the unread count is shown");
         form.SetAutoAdvance(true);
         Check(!unread.Available, "unread count hides when auto-advance is on");
+        int total = ((System.Collections.IList)Field(form, "responses")).Count;
+        typeof(FormMain).GetMethod("MarkSpoken", flags).Invoke(form, new object[] { total });
+        typeof(FormMain).GetField("speakingCompletedTime", flags).SetValue(form, DateTime.Now);
+        var idle = typeof(FormMain).GetMethod("ClearHighlightWhenIdle", flags);
+        idle.Invoke(form, new object[] { DateTime.Now.AddSeconds(3) });
+        bool kept = current() != null;
+        idle.Invoke(form, new object[] { DateTime.Now.AddSeconds(15) });
+        Check(kept && current() == null, "highlight stays briefly after the last reply, then clears");
+        typeof(FormMain).GetMethod("MarkSpoken", flags).Invoke(form, new object[] { 3 });
+        idle.Invoke(form, new object[] { DateTime.Now.AddSeconds(60) });
+        Check(current() != null, "highlight stays while unread replies remain");
+        ColourChecks(browser);
+        foreach (object response in (System.Collections.IList)Field(form, "responses"))
+            Script(browser, "addRes", (string)response.GetType().GetField("Html").GetValue(response));
     }
 
     static void BoardTrimChecks(FormMain form, WebBrowser browser, System.Collections.IList replies, MethodInfo apply)

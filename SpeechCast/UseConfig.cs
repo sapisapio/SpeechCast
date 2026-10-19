@@ -13,15 +13,22 @@ namespace SpeechCastMe
     {
         // UI refresh preferences, 2026-10-18.
         public bool JpnknBoardMode = false;
+        // Reopen the last board or thread at start-up (auto update turns on after loading).
+        public bool OpenLastOnStartup = true;
         public string CommentLayout = "compact";
         public string CommentTheme = "light";
         public string CommentBackground = "";
-        public int CommentFontSize = 16;
-        public string CommentFontName = "Meiryo";
+        public int CommentFontSize = 12; // MS Pゴシック 9pt, like the PeerCast player's comment viewer
+        // The original SpeechCast left the font to IE's Japanese default.
+        public string CommentFontName = "MS PGothic";
+        public bool CommentSeparators = true;
+        // Stream comments window: own font; size 0 follows the comment field.
+        public string StreamFontName = BundledFont.FamilyName;
+        public int StreamFontSize = 24;
         public bool CommentShowNumber = true;
         public bool CommentShowName = false;
         public bool CommentShowDate = false;
-        public bool CommentShowTime = false;
+        public bool CommentShowTime = true;
         public bool CommentShowID = false;
         public UserConfig()
         {
@@ -130,6 +137,11 @@ namespace SpeechCastMe
         /// メインフォームのウィンドウ位置
         /// </summary>
         public Rectangle FormMainRect;
+
+        /// <summary>
+        /// 配信モードのコメントウィンドウの位置と大きさ
+        /// </summary>
+        public Rectangle StreamOverlayBounds;
 
         /// <summary>
         /// 字幕フォントのウィンドウ位置

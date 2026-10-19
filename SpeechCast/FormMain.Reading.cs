@@ -11,6 +11,9 @@ namespace SpeechCastMe
     {
         // Queue position of the reply most recently started; highlighted in the view.
         private int lastSpokenNumber;
+        private bool highlightShown;
+        // The highlight goes away this long after the latest reply has been read.
+        private static readonly TimeSpan HighlightLinger = TimeSpan.FromSeconds(10);
         private ToolStripStatusLabel unreadStatusLabel;
 
         private void InitializeReadingUi()
@@ -40,6 +43,7 @@ namespace SpeechCastMe
             // View anchors carry Response.Number; the queue position is its index + 1.
             int anchor = lastSpokenNumber > 0 && lastSpokenNumber <= responses.Count ? responses[lastSpokenNumber - 1].Number : 0;
             webBrowser.Document.InvokeScript("setCurrent", new object[] { anchor, follow });
+            highlightShown = anchor > 0;
         }
 
         // ▶ reads the current reply again.
@@ -57,6 +61,16 @@ namespace SpeechCastMe
             if (!int.TryParse(value, out anchor)) return;
             int position = responses.FindIndex(r => r.Number == anchor) + 1;
             if (position > 0) StartSpeaking(position);
+        }
+
+        // Called from the reading timer: once everything has been read and nothing
+        // new arrived for a while, drop the yellow highlight.
+        private void ClearHighlightWhenIdle(DateTime now)
+        {
+            if (!highlightShown || isSpeaking || lastSpokenNumber < responses.Count) return;
+            if (now - speakingCompletedTime < HighlightLinger) return;
+            if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setCurrent", new object[] { 0, false });
+            highlightShown = false;
         }
 
         private void UpdateUnreadStatus()
