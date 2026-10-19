@@ -13,6 +13,7 @@
 ### アイコンの組み込み箇所
 - `SpeechCast/app3.ico`：アプリのアイコン。今はユーザーが手作りした「青.ico」をそのままコピーしたもの（256px PNG → 48 → 32 → 16px の4サイズ。おつまみキャストの exe と同じ構成）。
   **ユーザーが新しいアイコンファイルを用意する予定。**
+- 以前の別の試み（黒地に白い「SC」）として、`CreateScIcon.cs`（ico 書き出し用ツール）、`ICON.md`、`SpeechCast/Assets/sc-icon-master.png` がある（コミット ac93eaf）。今の app3.ico はこれではなく「青.ico」。
 - `SpeechCast/SpeechCastMe.csproj`
   - `<ApplicationIcon>app3.ico</ApplicationIcon>`：exe の Win32 アイコン（csc の /win32icon）
   - `<EmbeddedResource Include="app3.ico"><LogicalName>SpeechCastMe.app.ico</LogicalName>`：ウィンドウ用
