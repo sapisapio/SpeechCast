@@ -57,7 +57,7 @@ namespace SpeechCastMe
             colors.DropDownItems.Add(light);
             colors.DropDownDirection = ToolStripDropDownDirection.Left;
             gadgetButton.DropDownItems.Add(colors);
-            gadgetButton.DropDownItems.Add(new ToolStripMenuItem("音の設定…", null, delegate { ShowGadgetSoundSettings(); }));
+            gadgetButton.DropDownItems.Add(new ToolStripMenuItem("音の設定…", null, delegate { ShowSettings("ガジェット"); }));
             gadgetButton.DropDownOpening += delegate {
                 clock.Checked = clockWindow != null;
                 foreach (var gadget in timerGadgets) gadget.MenuItem.Checked = gadget.Window != null;
@@ -68,8 +68,9 @@ namespace SpeechCastMe
             statusStrip1.Items.Add(gadgetButton);
             Shown += delegate {
                 LoadGadgetSettings();
-                // The clock comes back if it was showing when the app last closed.
+                // The clock and the stream comments window come back if they were showing when the app last closed.
                 if (UserConfig != null && UserConfig.ClockOpen && !IsDesignPreview) ToggleClockGadget();
+                if (UserConfig != null && UserConfig.StreamOverlayOpen && !IsDesignPreview) EnterStreamMode();
             };
             gadgetTick.Tick += delegate { foreach (var gadget in timerGadgets) if (gadget.Timer.Running) gadget.Timer.Read(); };
             gadgetTick.Start();
@@ -289,31 +290,15 @@ namespace SpeechCastMe
             }
         }
 
-        // Volume (applies at once) and buttons to hear both sounds.
-        private void ShowGadgetSoundSettings()
+        // Settings → ガジェット: hear a sound at the volume being chosen.
+        internal void TestGadgetSound(string sound, int volume)
         {
-            if (UserConfig == null) return;
-            using (var dialog = new Form { Text = "ガジェットの音", Font = Font, StartPosition = FormStartPosition.CenterParent,
-                ClientSize = new Size(340, 176), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false })
-            {
-                dialog.Controls.Add(new Label { Text = "音量", Left = 18, Top = 22, AutoSize = true });
-                var volume = new TrackBar { Minimum = 0, Maximum = 100, TickStyle = TickStyle.None, Left = 70, Top = 16, Width = 200,
-                    Value = Math.Max(0, Math.Min(100, UserConfig.GadgetVolume)) };
-                var volumeText = new Label { Text = volume.Value.ToString(), Left = 276, Top = 22, Width = 40 };
-                volume.ValueChanged += delegate { UserConfig.GadgetVolume = volume.Value; volumeText.Text = volume.Value.ToString(); };
-                dialog.Controls.Add(new Label { Text = "アラームは止めるまで鳴ります（タイマーの「開始/停止」か「リセット」で止まります）。", Left = 18, Top = 62, Width = 310, Height = 34, ForeColor = SystemColors.GrayText });
-                var testAlarm = new Button { Text = "アラームを試す", Left = 18, Top = 104, Width = 130, Height = 30 };
-                var testChime = new Button { Text = "チャイムを試す", Left = 156, Top = 104, Width = 130, Height = 30 };
-                testAlarm.Click += delegate { PlayGadgetSound(null, GadgetTimer.BeepSound); };
-                testChime.Click += delegate { PlayGadgetSound(null, GadgetTimer.ChimeSound); };
-                var stop = new Button { Text = "止める", Left = 18, Top = 140, Width = 80 };
-                stop.Click += delegate { StopGadgetSound(null); };
-                var close = new Button { Text = "閉じる", DialogResult = DialogResult.Cancel, Left = 244, Top = 140, Width = 80 };
-                dialog.Controls.AddRange(new Control[] { volume, volumeText, testAlarm, testChime, stop, close });
-                dialog.CancelButton = close;
-                dialog.ShowDialog(this);
-                StopGadgetSound(null); // a test still playing ends with the dialog
-            }
+            ringingGadget = null;
+            ringingSound = sound;
+            try { gadgetSound.Play(GadgetSounds.PathFor(sound), volume); }
+            catch (Exception ex) { AddLog("Gadget sound: {0}", ex.Message); }
         }
+
+        internal void StopGadgetTest() { StopGadgetSound(null); }
     }
 }

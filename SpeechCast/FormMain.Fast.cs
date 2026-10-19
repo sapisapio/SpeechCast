@@ -1,14 +1,18 @@
 // jpnkn Fast integration and board-wide feed, 2026-10-19. GPLv2.
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace SpeechCastMe
 {
     public partial class FormMain
     {
-        private ToolStripComboBox feedModeSelector;
-        private ToolStripStatusLabel fastStatusLabel;
+        // jpnkn only, on the status bar: shows the Fast state and picks how replies arrive (remembered in the settings).
+        private ToolStripDropDownButton fastModeButton;
+        private ToolStripMenuItem fastThreadItem, fastBoardItem, httpItem;
+        private string fastState; // "Fast 受信中" etc. while a Fast session exists
+        public const string FastThreadMode = "fast", FastBoardMode = "board", HttpMode = "http";
         private JpnknFastTarget fastTarget;
         private JpnknFastClient fastClient;
         private int fastGeneration;
@@ -25,34 +29,95 @@ namespace SpeechCastMe
 
         private void InitializeFastUi()
         {
-            feedModeSelector = new ToolStripComboBox { Name = "feedModeSelector", DropDownStyle = ComboBoxStyle.DropDownList,
-                AutoSize = false, Width = 108, ToolTipText = "スレッド指定 / jpnkn板全体の新着受信" };
-            feedModeSelector.Items.AddRange(new object[] { "スレッド", "板全体 Fast" });
-            myToolStripUrl.Items.Insert(0, feedModeSelector);
-            fastStatusLabel = new ToolStripStatusLabel { Name = "fastStatusLabel", Available = false };
-            statusStrip1.Items.Insert(1, fastStatusLabel);
-            feedModeSelector.SelectedIndexChanged += delegate {
-                if (syncingFeedMode || UserConfig == null) return;
-                UserConfig.JpnknBoardMode = feedModeSelector.SelectedIndex == 1;
-                if (!IsDesignPreview) { StopSpeakingCore(); AutoUpdate = false; ClearFastSession(); }
-                UpdateFeedModeUi();
+            fastModeButton = new ToolStripDropDownButton { Name = "fastModeButton", DropDownDirection = ToolStripDropDownDirection.AboveRight,
+                DisplayStyle = ToolStripItemDisplayStyle.Text, Available = false, Margin = new Padding(0, 1, 14, 1),
+                ToolTipText = "jpnkn の新着の受け取り方" };
+            fastThreadItem = new Controls.DescribedMenuItem("Fastスレッド（標準）", "jpnkn の Fast 配信で、このスレの新着をすぐに受け取ります。", delegate { SetFeedMode(FastThreadMode); });
+            fastBoardItem = new Controls.DescribedMenuItem("Fast板全部", "板の全スレの新着を届いた順に流します。過去のレスは出ず、次スレへの移動も要りません。", delegate { SetFeedMode(FastBoardMode); });
+            httpItem = new Controls.DescribedMenuItem("従来の方式", "設定した間隔でスレを読み直して、新着を確かめます。", delegate { SetFeedMode(HttpMode); });
+            fastModeButton.DropDownItems.AddRange(new ToolStripItem[] { fastThreadItem, fastBoardItem, httpItem });
+            // The menu sizes itself to the titles; make room for the explanations underneath.
+            fastModeButton.DropDown.Opening += delegate {
+                int width = 0;
+                foreach (ToolStripItem item in fastModeButton.DropDownItems) width = Math.Max(width, item.GetPreferredSize(Size.Empty).Width);
+                fastModeButton.DropDown.MinimumSize = new Size(width + 8, 0);
             };
+            statusStrip1.Items.Insert(1, fastModeButton);
+            toolStripTextBoxURL.TextChanged += delegate { UpdateFastButton(); };
+        }
+
+        internal string FeedMode
+        {
+            get { return UserConfig == null ? FastThreadMode : UserConfig.JpnknBoardMode ? FastBoardMode : UserConfig.JpnknHttpOnly ? HttpMode : FastThreadMode; }
+        }
+
+        // Takes effect at once: thread <-> board reloads; Fast <-> 従来 keeps the replies and
+        // only changes how new ones arrive.
+        internal void SetFeedMode(string mode)
+        {
+            if (UserConfig == null || mode == FeedMode) return;
+            bool boardChanged = (mode == FastBoardMode) != UserConfig.JpnknBoardMode;
+            UserConfig.JpnknBoardMode = mode == FastBoardMode;
+            if (mode != FastBoardMode) UserConfig.JpnknHttpOnly = mode == HttpMode;
+            UpdateFeedModeUi();
+            if (IsDesignPreview) return;
+            if (boardChanged)
+            {
+                StopSpeakingCore(); AutoUpdate = false; ClearFastSession();
+                if (toolStripTextBoxURL.Text.Trim().Length > 0) GetFromURL();
+                return;
+            }
+            if (mode == HttpMode)
+            {
+                StopFastClient();
+                fastTarget = null;
+                fastPending.Clear();
+            }
+            else
+            {
+                JpnknFastTarget target;
+                if (responses.Count > 0 && JpnknFastTarget.TryParse(toolStripTextBoxURL.Text, false, out target))
+                {
+                    fastTarget = target;
+                    fastNeedsRecovery = true; // catch up over HTTP once connected
+                    EnsureFastSubscription();
+                }
+            }
+            UpdateFastButton();
         }
 
         private void UpdateFeedModeUi()
         {
             if (UserConfig == null) return;
-            syncingFeedMode = true;
-            feedModeSelector.SelectedIndex = UserConfig.JpnknBoardMode ? 1 : 0;
-            syncingFeedMode = false;
             toolStripLabel7.Available = toolStripTextBoxThreadKeyword.Available = toolStripButtonAutoNextThread.Available = !UserConfig.JpnknBoardMode;
             // Board feeds have no single destination thread for the old writer.
             toolStripButtonResponse.Enabled = toolStripButtonThreads.Enabled = !IsDesignPreview && !UserConfig.JpnknBoardMode;
             toolStripButtonResponse.ToolTipText = UserConfig.JpnknBoardMode ? "投稿はコメントの元スレへのリンクから行ってください" : "レスを書く";
             toolStripTextBoxURL.ToolTipText = UserConfig.JpnknBoardMode
-                ? "jpnknの掲示板URLまたは板ID（Enterで板全体の新着受信を開始）"
-                : "スレッドURL（Enterで読み込み。jpnknはFastで新着受信）";
+                ? "jpnknの掲示板URLまたは板ID（Enterで板全部の新着受信を開始）"
+                : "スレッドURL（Enterで読み込み）";
             myToolStripUrl.PerformLayout();
+            UpdateFastButton();
+        }
+
+        // Shown only for jpnkn: the session state while one runs, otherwise the chosen mode.
+        private void UpdateFastButton()
+        {
+            if (fastModeButton == null || UserConfig == null) return;
+            string mode = FeedMode;
+            fastThreadItem.Checked = mode == FastThreadMode;
+            fastBoardItem.Checked = mode == FastBoardMode;
+            httpItem.Checked = mode == HttpMode;
+            fastModeButton.Available = fastTarget != null || UserConfig.JpnknBoardMode || IsJpnknInput(toolStripTextBoxURL.Text);
+            fastModeButton.Text = fastTarget != null && fastState != null ? fastState
+                : mode == HttpMode ? "従来の方式" : mode == FastBoardMode ? "Fast板全部" : "Fastスレッド";
+        }
+
+        private void SetFastState(string state, string detail)
+        {
+            fastState = state;
+            if (fastModeButton != null) fastModeButton.ToolTipText = detail ?? "jpnkn の新着の受け取り方";
+            UpdateFastButton();
         }
 
         private void StopFastClient()
@@ -61,7 +126,7 @@ namespace SpeechCastMe
             if (fastClient != null) fastClient.Dispose();
             fastClient = null;
             fastConnected = false;
-            if (fastStatusLabel != null) fastStatusLabel.Text = "Fast 停止";
+            SetFastState(null, null);
         }
 
         private void ClearFastSession()
@@ -74,7 +139,7 @@ namespace SpeechCastMe
             // A new thread or board starts without a highlighted reply.
             lastSpokenNumber = 0;
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setCurrent", new object[] { 0, false });
-            if (fastStatusLabel != null) fastStatusLabel.Available = false;
+            UpdateFastButton();
         }
 
         private void OnFastAcquisitionChanged(bool enabled)
@@ -95,12 +160,10 @@ namespace SpeechCastMe
             if (fastTarget == null || fastClient != null || !AutoUpdate || IsDesignPreview) return;
             int generation = ++fastGeneration;
             fastClient = new JpnknFastClient(fastTarget.Board);
-            fastStatusLabel.Available = true;
-            fastStatusLabel.Text = "Fast 接続中…";
+            SetFastState("Fast 接続中…", null);
             fastClient.ConnectionChanged += (connected, message) => PostFastEvent(generation, delegate {
                 fastConnected = connected;
-                fastStatusLabel.Text = connected ? "Fast 受信中" : "Fast 再接続待ち";
-                fastStatusLabel.ToolTipText = message;
+                SetFastState(connected ? "Fast 受信中" : "Fast 再接続待ち", message);
                 if (connected && !IsFastBoardFeed) { fastNeedsRecovery = true; lastFastRecovery = DateTime.MinValue; }
             });
             fastClient.ReplyReceived += message => PostFastEvent(generation, delegate {
@@ -112,8 +175,10 @@ namespace SpeechCastMe
         private void ConfigureThreadFast()
         {
             ClearFastSession();
+            if (UserConfig != null && UserConfig.JpnknHttpOnly) return; // 従来の方式: HTTP polling only
             JpnknFastTarget target;
             if (JpnknFastTarget.TryParse(toolStripTextBoxURL.Text, false, out target)) fastTarget = target;
+            UpdateFastButton();
         }
 
         private void BeginBoardFeed(JpnknFastTarget target)
@@ -126,7 +191,7 @@ namespace SpeechCastMe
             oldUrl = null; rawURL = null; oldResCount = 0; datSize = 1;
             baseURL = target.BoardUrl;
             threadId = "";
-            threadTitle = target.Board + " — 板全体 Fast";
+            threadTitle = target.Board + " — Fast板全部";
             Text = "Speech Cast SP — " + threadTitle;
             endThreadWarning = false; WarningNextThread = false; openNextThread = ReadThread;
             isSpeakingWarningMessage = false;

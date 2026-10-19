@@ -108,7 +108,7 @@
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "ブックマークの追加";
+            this.Text = "掲示板を登録";
             this.ResumeLayout(false);
             this.PerformLayout();
 

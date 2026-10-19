@@ -236,10 +236,18 @@
     <Compile Include="GadgetTimer.cs" />
     <Compile Include="Gadgets.cs" />
     <Compile Include="FormMain.Gadgets.cs" />
+    <Compile Include="FormMain.Hotkeys.cs" />
     <Compile Include="GadgetSounds.cs" />
+    <Compile Include="StreamTemplates.cs" />
+    <Compile Include="FormSettings.Display.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Controls\SpinField.cs" />
     <Compile Include="Controls\ThemedTrackBar.cs" />
     <Compile Include="Controls\ComboChrome.cs" />
+    <Compile Include="Controls\DescribedMenuItem.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="NotificationSoundPlayer.cs" />
     <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />

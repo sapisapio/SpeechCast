@@ -28,6 +28,10 @@ namespace SpeechCastMe
         public int ScrollY = -1;
         public static BBSStyle Style;
         public const string AnchorUrl = "http://res/";
+        // Shitaraba boards set their own thread limit (BBS_THREAD_STOP, often 1000, some 5000);
+        // read from the board settings when a thread opens. Polling stops at this count.
+        public static int JbbsThreadStop = 1000;
+
         public static int MaxResponseCount
         {
             get
@@ -35,7 +39,7 @@ namespace SpeechCastMe
                 switch (Style)
                 {
                     case BBSStyle.jbbs:
-                        return 1000;
+                        return JbbsThreadStop;
                     case BBSStyle.yykakiko:
                     // ミミックかってに改造 ぜろちゃんねる対応追加
                     case BBSStyle.zerochan:

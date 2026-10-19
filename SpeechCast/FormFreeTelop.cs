@@ -19,12 +19,18 @@ namespace SpeechCastMe
         {
             var config = FormMain.UserConfig;
             if (config == null) return null;
-            return string.Join("|", source() ?? "", config.TelopFontName, config.TelopFontSize);
+            return string.Join("|", source() ?? "", config.TelopFontName, config.TelopFontSize, config.TelopTextColor, config.TelopOutlineColor, config.TelopOutlineWidth);
         }
 
         protected override Bitmap Render(Size size) { return RenderFrame(source(), size); }
 
-        // Text from the top-left, wrapped to the window width, white with a black outline.
+        internal static Color ParseColor(string html, Color fallback)
+        {
+            try { return string.IsNullOrEmpty(html) ? fallback : ColorTranslator.FromHtml(html); }
+            catch (Exception) { return fallback; }
+        }
+
+        // Text from the top-left, wrapped to the window width, in the chosen colors and outline.
         internal static Bitmap RenderFrame(string text, Size size)
         {
             var config = FormMain.UserConfig;
@@ -36,7 +42,9 @@ namespace SpeechCastMe
                 int width = size.Width - Inset * 2;
                 if (text.Length == 0 || width < 1) return bitmap;
                 string name = string.IsNullOrEmpty(config.TelopFontName) ? BundledFont.FamilyName : config.TelopFontName;
-                var style = FormStreamOverlay.Style(name, Math.Max(10, Math.Min(160, config.TelopFontSize)), Color.White);
+                var style = FormStreamOverlay.Style(name, Math.Max(10, Math.Min(160, config.TelopFontSize)), ParseColor(config.TelopTextColor, Color.White));
+                style.Colors.BorderColor = ParseColor(config.TelopOutlineColor, Color.Black);
+                style.BorderSize = Math.Max(0, Math.Min(12, config.TelopOutlineWidth));
                 using (var format = (System.Drawing.StringFormat)System.Drawing.StringFormat.GenericTypographic.Clone())
                 using (var font = style.CreateFont())
                 {

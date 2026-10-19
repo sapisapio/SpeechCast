@@ -20,12 +20,13 @@ namespace SpeechCastMe
         public FormSettings()
         {
             InitializeComponent();
+            InitializeDisplayTabs();
             checkBoxPlaySoundNewResponse.Visible = false;
             checkBoxPlaySoundNewResevery.Visible = false;
             checkBoxPlaySoundSync.Visible = false;
             tabPage8.Text = "着信音";
-            audioModeSelector = new ComboBox { Name = "audioModeSelector", Location = new Point(9, 18), Width = 110, DropDownStyle = ComboBoxStyle.DropDownList };
-            audioModeSelector.Items.AddRange(new object[] { "読み上げ", "着信音", "無音" });
+            audioModeSelector = new ComboBox { Name = "audioModeSelector", Location = new Point(9, 18), Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
+            audioModeSelector.Items.AddRange(FormMain.AudioModeNames);
             checkBoxPlaySoundNewResponse.Parent.Controls.Add(audioModeSelector);
             checkBoxPlaySoundNewResponse.Parent.Controls.Add(new Label { Text = "新着があった更新ごとに1回通知します。", AutoSize = true, Location = new Point(9, 48) });
             panelPlaySound.Enabled = true;
@@ -169,6 +170,7 @@ namespace SpeechCastMe
 
             numericUpDownViewerYoutubePlayerHeight.Value = userConfig.ViewerYoutubePlayerHeight;
             numericUpDownViewerYoutubePlayerWidth.Value = userConfig.ViewerYoutubePlayerWidth;
+            SetDisplaySettings(userConfig);
             UpdateUI();
         }
 
@@ -276,7 +278,7 @@ namespace SpeechCastMe
             {
                 userConfig.LogAppendMode = false;
             }
-
+            GetDisplaySettings(userConfig);
         }
         
 

@@ -13,8 +13,12 @@ namespace SpeechCastMe
         private OverlayHoverBar telopBar;
         private ToolStripButton telopButton;
         private ToolStripButton telopToggle;
-        private ToolStripLabel telopSizeLabel;
+        private ToolStripTextBox telopSizeLabel; // the size in px: typed, or stepped with − ＋ / ↑ ↓ / the wheel
         private ToolStripDropDownButton telopFontButton;
+        private ToolStripDropDownButton telopColorButton;
+        private ToolStripMenuItem telopTextColorItem, telopOutlineColorItem;
+        private readonly ToolStripMenuItem[] telopWidthItems = new ToolStripMenuItem[7];
+        private static readonly int[] TelopOutlineWidths = { 0, 1, 2, 3, 4, 6, 8 };
 
         internal bool IsTelopOpen { get { return telopWindow != null; } }
 
@@ -23,7 +27,7 @@ namespace SpeechCastMe
             telopButton = new ToolStripButton("自由テロップ") { Name = "telopButton", Alignment = ToolStripItemAlignment.Right,
                 DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "自由テロップの窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）" };
             telopButton.Click += delegate { ToggleTelopWindow(); };
-            menuStrip1.Items.Add(telopButton);
+            // Not on the menu bar: the telop input row has its own 表示 / 非表示 (the button stays as state).
 
             // The input area: the text box plus a toolbar in the same style as the main
             // rows: window toggle | size − 40px ＋ | font menu.
@@ -32,12 +36,22 @@ namespace SpeechCastMe
                 BackColor = BackColor, Font = new Font("Yu Gothic UI", 9F), Padding = new Padding(4, 2, 4, 2), CanOverflow = true };
             telopToggle = new ToolStripButton { Name = "telopToggle" };
             SetIconButton(telopToggle, "altcaption", "自由テロップの窓を開く / 閉じる（OBSのウィンドウキャプチャ用）");
-            SetLabelledIcon(telopToggle, "テロップ窓");
+            SetLabelledIcon(telopToggle, "非表示"); // 表示 while the window is open (SyncTelopUi)
             telopToggle.Click += delegate { ToggleTelopWindow(); };
             var smaller = new ToolStripButton { Name = "telopSmaller" };
             SetIconButton(smaller, "zoomout", "テロップの文字を小さく（1px）");
             smaller.Click += delegate { ChangeTelopSize(-1); };
-            telopSizeLabel = new ToolStripLabel { Name = "telopSizeLabel", AutoSize = false, Width = 44, TextAlign = ContentAlignment.MiddleCenter, ToolTipText = "テロップの文字の大きさ" };
+            telopSizeLabel = new ToolStripTextBox { Name = "telopSizeLabel", AutoSize = false, Width = 40, MaxLength = 3, ToolTipText = "テロップの文字の大きさ（px）。数字を入れて Enter" };
+            telopSizeLabel.TextBox.TextAlign = HorizontalAlignment.Center;
+            telopSizeLabel.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            telopSizeLabel.KeyDown += (s, e) => {
+                if (e.KeyCode == Keys.Enter) { CommitTelopSize(); e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Up) { ChangeTelopSize(1); e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Down) { ChangeTelopSize(-1); e.SuppressKeyPress = true; }
+            };
+            telopSizeLabel.Leave += delegate { CommitTelopSize(); };
+            telopSizeLabel.TextBox.MouseWheel += (s, e) => ChangeTelopSize(e.Delta > 0 ? 1 : -1);
+            var pixels = new ToolStripLabel("px") { Margin = new Padding(0, 1, 2, 2) };
             var larger = new ToolStripButton { Name = "telopLarger" };
             SetIconButton(larger, "zoomin", "テロップの文字を大きく（1px）");
             larger.Click += delegate { ChangeTelopSize(1); };
@@ -47,7 +61,19 @@ namespace SpeechCastMe
             telopFontButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             telopFontButton.DropDownItems.Add("源暎エムゴ v2 Black（内蔵）", null, delegate { UserConfig.TelopFontName = BundledFont.FamilyName; SyncTelopUi(); });
             telopFontButton.DropDownItems.Add("ほかのフォントを選ぶ…", null, delegate { ChooseTelopFont(); });
-            row.Items.AddRange(new ToolStripItem[] { telopToggle, new ToolStripSeparator(), smaller, telopSizeLabel, larger, new ToolStripSeparator(), telopFontButton });
+            // Inside and outline colors and the outline width; the swatches show the current colors.
+            telopColorButton = new ToolStripDropDownButton("色・縁取り") { Name = "telopColor", DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "テロップの文字の色と縁取り" };
+            telopTextColorItem = new ToolStripMenuItem("文字の色…", null, delegate { ChooseTelopColor(true); });
+            telopOutlineColorItem = new ToolStripMenuItem("縁取りの色…", null, delegate { ChooseTelopColor(false); });
+            var widths = new ToolStripMenuItem("縁取りの幅");
+            for (int i = 0; i < TelopOutlineWidths.Length; i++)
+            {
+                int width = TelopOutlineWidths[i];
+                telopWidthItems[i] = new ToolStripMenuItem(width == 0 ? "なし" : width + " px", null, delegate { UserConfig.TelopOutlineWidth = width; SyncTelopUi(); });
+                widths.DropDownItems.Add(telopWidthItems[i]);
+            }
+            telopColorButton.DropDownItems.AddRange(new ToolStripItem[] { telopTextColorItem, telopOutlineColorItem, new ToolStripSeparator(), widths });
+            row.Items.AddRange(new ToolStripItem[] { telopToggle, new ToolStripSeparator(), smaller, telopSizeLabel, pixels, larger, new ToolStripSeparator(), telopFontButton, telopColorButton });
             splitContainerpkCaption.Panel2.Controls.Add(row);
             SyncTelopUi();
             splitContainerpkCaption.Panel2MinSize = 0;
@@ -119,13 +145,43 @@ namespace SpeechCastMe
         private void SyncTelopUi()
         {
             if (telopButton != null) telopButton.Checked = IsTelopOpen;
-            if (telopToggle != null) telopToggle.Checked = IsTelopOpen;
+            if (telopToggle != null) { telopToggle.Checked = IsTelopOpen; telopToggle.Text = IsTelopOpen ? "表示" : "非表示"; }
             if (UserConfig != null && telopSizeLabel != null)
             {
-                telopSizeLabel.Text = UserConfig.TelopFontSize + "px";
+                if (!telopSizeLabel.Focused) telopSizeLabel.Text = UserConfig.TelopFontSize.ToString();
                 string name = string.IsNullOrEmpty(UserConfig.TelopFontName) ? BundledFont.FamilyName : UserConfig.TelopFontName;
                 telopFontButton.Text = name == BundledFont.FamilyName ? "源暎エムゴ（内蔵）" : name;
+                SetSwatch(telopTextColorItem, FormFreeTelop.ParseColor(UserConfig.TelopTextColor, Color.White));
+                SetSwatch(telopOutlineColorItem, FormFreeTelop.ParseColor(UserConfig.TelopOutlineColor, Color.Black));
+                for (int i = 0; i < TelopOutlineWidths.Length; i++) telopWidthItems[i].Checked = TelopOutlineWidths[i] == UserConfig.TelopOutlineWidth;
             }
+        }
+
+        private static void SetSwatch(ToolStripMenuItem item, Color color)
+        {
+            if (item == null) return;
+            var swatch = new Bitmap(16, 16);
+            using (var g = Graphics.FromImage(swatch))
+            using (var fill = new SolidBrush(color))
+            {
+                g.FillRectangle(fill, 1, 1, 14, 14);
+                g.DrawRectangle(Pens.Gray, 1, 1, 13, 13);
+            }
+            if (item.Image != null) item.Image.Dispose();
+            item.Image = swatch;
+        }
+
+        private void ChooseTelopColor(bool text)
+        {
+            if (UserConfig == null) return;
+            var current = text ? FormFreeTelop.ParseColor(UserConfig.TelopTextColor, Color.White) : FormFreeTelop.ParseColor(UserConfig.TelopOutlineColor, Color.Black);
+            using (var dialog = new ColorDialog { FullOpen = true, Color = current })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                string html = ColorTranslator.ToHtml(Color.FromArgb(dialog.Color.R, dialog.Color.G, dialog.Color.B));
+                if (text) UserConfig.TelopTextColor = html; else UserConfig.TelopOutlineColor = html;
+            }
+            SyncTelopUi();
         }
 
         // Same step as the comment zoom buttons: one pixel at a time.
@@ -133,6 +189,17 @@ namespace SpeechCastMe
         {
             if (UserConfig == null) return;
             UserConfig.TelopFontSize = Math.Max(10, Math.Min(160, UserConfig.TelopFontSize + delta));
+            telopSizeLabel.Text = UserConfig.TelopFontSize.ToString();
+            SyncTelopUi();
+        }
+
+        // A typed size takes effect on Enter or leaving the field; anything else restores the current one.
+        private void CommitTelopSize()
+        {
+            if (UserConfig == null) return;
+            int typed;
+            if (int.TryParse(telopSizeLabel.Text, out typed)) UserConfig.TelopFontSize = Math.Max(10, Math.Min(160, typed));
+            telopSizeLabel.Text = UserConfig.TelopFontSize.ToString();
             SyncTelopUi();
         }
 

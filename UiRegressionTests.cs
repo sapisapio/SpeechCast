@@ -62,7 +62,7 @@ class UiRegressionTests
         Check(old.CommentLayout == "compact" && old.CommentTheme == "light", "older settings receive defaults");
         var legacyAudio = (UserConfig)serializer.Deserialize(new StringReader("<UserConfig><SpeakMode>true</SpeakMode><PlaySoundNewResponse>true</PlaySoundNewResponse><NavigationSound>true</NavigationSound></UserConfig>"));
         legacyAudio.SupplementSettings();
-        Check(legacyAudio.AudioMode == AudioNotificationMode.Speech && !legacyAudio.PlaySoundNewResponse && !legacyAudio.NavigationSound, "legacy simultaneous audio settings migrate to speech and suppress browser clicks");
+        Check(legacyAudio.AudioMode == AudioNotificationMode.SpeechAndSound && !legacyAudio.NavigationSound, "legacy simultaneous audio settings keep both as 読み上げ＋着信音 and suppress browser clicks");
         foreach (AudioNotificationMode mode in Enum.GetValues(typeof(AudioNotificationMode)))
         {
             config.AudioMode = mode;
@@ -70,7 +70,7 @@ class UiRegressionTests
             {
                 serializer.Serialize(writer, config);
                 var restored = (UserConfig)serializer.Deserialize(new StringReader(writer.ToString()));
-                Check(restored.AudioMode == mode && !(restored.SpeakMode && restored.PlaySoundNewResponse), "exclusive audio mode persists: " + mode);
+                Check(restored.AudioMode == mode && (restored.SpeakMode && restored.PlaySoundNewResponse) == (mode == AudioNotificationMode.SpeechAndSound), "audio mode persists: " + mode);
             }
         }
         FormMain.UserConfig = config;
@@ -289,10 +289,10 @@ class UiRegressionTests
                 Color fill = bitmap.GetPixel(on.Bounds.Left + 4, on.Bounds.Top + on.Bounds.Height / 2);
                 Check(fill.ToArgb() == ReaderToolbarRenderer.CheckedFill.ToArgb(), "checked buttons are filled pale yellow");
             }
-            Check(url.Items.Count == 5 && url.Items[0] == Field(form,"feedModeSelector") && url.Items[1] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row contains source mode URL keyword and toggle");
+            Check(url.Items.Count == 4 && url.Items[0] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row contains URL keyword and toggle");
             Check(autoUpdate.Text == "自動更新" && autoUpdate.DisplayStyle == ToolStripItemDisplayStyle.ImageAndText && ((ToolStripButton)Field(form,"toolStripButtonTurbo")).Text == "ターボ", "auto update is labelled and turbo keeps its label");
             var modes = (ToolStripComboBox)Field(form,"audioModeSelector");
-            Check(modes.Owner == voice && modes.Items.Count == 3 && ((ToolStripItem)Field(form,"toolStripButtonClickSound")).Owner == null, "audio selector replaces independent toggles and removes reload sound");
+            Check(modes.Owner == voice && modes.Items.Count == 4 && ((ToolStripItem)Field(form,"toolStripButtonClickSound")).Owner == null, "audio selector replaces independent toggles and removes reload sound");
             modes.SelectedIndex = (int)AudioNotificationMode.Sound;
             Check(FormMain.UserConfig.PlaySoundNewResponse && !FormMain.UserConfig.SpeakMode && !((ToolStripItem)Field(form,"toolStripTrackBarVoiceVolume")).Enabled && ((ToolStripItem)Field(form,"toolStripTrackBarPlayVolume")).Enabled, "sound mode enables only notification volume");
             typeof(FormMain).GetProperty("communicationStatusString", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(form,"polling countdown",null);
@@ -401,8 +401,7 @@ class UiRegressionTests
     static void BoardFeedChecks(FormMain form, WebBrowser browser)
     {
         var flags = BindingFlags.NonPublic | BindingFlags.Instance;
-        var modes = (ToolStripComboBox)Field(form,"feedModeSelector");
-        modes.SelectedIndex = 1;
+        typeof(FormMain).GetMethod("SetFeedMode",BindingFlags.NonPublic | BindingFlags.Instance).Invoke(form,new object[] {"board"});
         Check(FormMain.UserConfig.JpnknBoardMode && !((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Available, "board mode hides next-thread controls and needs only a board input");
         JpnknFastTarget target; JpnknFastTarget.TryParse("sapio",true,out target);
         typeof(FormMain).GetMethod("BeginBoardFeed",flags).Invoke(form,new object[] {target});
@@ -503,10 +502,10 @@ class UiRegressionTests
         Check(window.Visible && window.Bounds == onScreen && (exStyle & 0x80000) != 0 && (exStyle & 0x20) != 0 && ((ToolStripButton)get("telopButton")).Checked && ((ToolStripButton)get("telopToggle")).Checked,
             "free telop opens as its own transparent click-through window");
         Check((bool)window.GetType().GetProperty("LastUpdateSucceeded", flags).GetValue(window, null), "free telop window accepts its alpha frame");
-        Check(((ToolStripLabel)get("telopSizeLabel")).Text == FormMain.UserConfig.TelopFontSize + "px" && ((ToolStripDropDownButton)get("telopFontButton")).Text.Length > 0, "telop size and font are shown from start-up");
+        Check(((ToolStripItem)get("telopSizeLabel")).Text == FormMain.UserConfig.TelopFontSize.ToString() && ((ToolStripDropDownButton)get("telopFontButton")).Text.Length > 0, "telop size and font are shown from start-up");
         int size = FormMain.UserConfig.TelopFontSize;
         typeof(FormMain).GetMethod("ChangeTelopSize", flags).Invoke(form, new object[] { 1 });
-        Check(FormMain.UserConfig.TelopFontSize == size + 1 && ((ToolStripLabel)get("telopSizeLabel")).Text == (size + 1) + "px", "telop size steps by one pixel and shows it");
+        Check(FormMain.UserConfig.TelopFontSize == size + 1 && ((ToolStripItem)get("telopSizeLabel")).Text == (size + 1).ToString(), "telop size steps by one pixel and shows it");
         typeof(FormMain).GetMethod("ChangeTelopSize", flags).Invoke(form, new object[] { -1 });
         var fontButton = (ToolStripDropDownButton)get("telopFontButton");
         FormMain.UserConfig.TelopFontName = "MS PGothic";
@@ -527,29 +526,8 @@ class UiRegressionTests
         Func<string, bool> jp = s => (bool)isJpnkn.Invoke(null, new object[] { s });
         Check(jp("sapio") && jp("https://bbs.jpnkn.com/sapio/") && jp("https://bbs.jpnkn.com/test/read.cgi/sapio/123/") && !jp("https://jbbs.shitaraba.net/bbs/read.cgi/game/1/2/") && !jp(""), "jpnkn boards and threads are recognised for the mode choice");
         Check(new UserConfig().OpenLastOnStartup, "the last board reopens on start-up by default");
-        Check(((MenuStrip)Field(form, "menuStrip1")).Items["openBoardMenu"] != null, "open board menu is on the menu bar");
-        bool preview = (bool)typeof(FormMain).GetField("IsDesignPreview", flags).GetValue(form);
-        typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, false);
-        bool jpnknShown = false, otherShown = false, otherHidden = false;
-        var timer = new System.Windows.Forms.Timer { Interval = 200 };
-        timer.Tick += delegate {
-            Form dialog = null;
-            foreach (Form open in Application.OpenForms) if (open.Text == "掲示板を開く") dialog = open;
-            if (dialog == null) return;
-            timer.Stop();
-            TextBox url = null; Panel panel = null; Label other = null;
-            foreach (Control c in dialog.Controls) { if (c is TextBox) url = (TextBox)c; else if (c is Panel) panel = (Panel)c; else if (c is Label && c.Text.StartsWith("板のURL")) other = (Label)c; }
-            url.Text = "https://bbs.jpnkn.com/sapio/";
-            jpnknShown = panel.Visible; otherHidden = !other.Visible;
-            url.Text = "https://jbbs.shitaraba.net/game/42885/";
-            otherShown = other.Visible && !panel.Visible;
-            dialog.DialogResult = DialogResult.Cancel;
-        };
-        timer.Start();
-        bool opened = (bool)typeof(FormMain).GetMethod("ShowOpenBoard", flags).Invoke(form, null);
-        timer.Dispose();
-        typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, preview);
-        Check(!opened && jpnknShown && otherHidden && otherShown, "the open dialog offers Fast or thread reading only for jpnkn");
+        var boards = ((MenuStrip)Field(form, "menuStrip1")).Items[0];
+        Check(boards == Field(form, "toolStripMenuItemBookmarks") && boards.Text.StartsWith("掲示板を開く"), "the board list opens from 掲示板を開く, first on the menu bar");
     }
 
     static void StreamChecks(FormMain form)
@@ -564,7 +542,7 @@ class UiRegressionTests
         int exStyle = GetWindowLong(overlay.Handle, -20);
         Check((exStyle & 0x80000) != 0 && (exStyle & 0x20) != 0, "stream window is layered and click-through");
         Check((bool)overlay.GetType().GetProperty("LastUpdateSucceeded", flags).GetValue(overlay, null), "stream window accepts its per-pixel alpha frame");
-        var render = overlay.GetType().GetMethod("RenderFrame", BindingFlags.NonPublic | BindingFlags.Static);
+        var render = Array.Find(overlay.GetType().GetMethods(BindingFlags.NonPublic | BindingFlags.Static), m => m.Name == "RenderFrame" && m.GetParameters().Length == 2);
         var responses = Field(form, "responses");
         using (var frame = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
         {
@@ -579,19 +557,19 @@ class UiRegressionTests
             Check(clear > frame.Width * frame.Height / 4 && white > 300 && black > 300, "comments render white with a black outline over a transparent background");
             frame.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "stream-frame.png"), ImageFormat.Png);
         }
-        bool showNumber = FormMain.UserConfig.CommentShowNumber;
-        FormMain.UserConfig.CommentShowNumber = false;
+        bool showNumber = FormMain.UserConfig.StreamShowNumber;
+        FormMain.UserConfig.StreamShowNumber = false;
         using (var without = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
         {
-            FormMain.UserConfig.CommentShowNumber = true;
+            FormMain.UserConfig.StreamShowNumber = true;
             using (var with = (Bitmap)render.Invoke(null, new object[] { responses, new Size(400, 300) }))
             {
                 bool differs = false;
                 for (int y = 0; y < 300 && !differs; y += 3) for (int x = 0; x < 400 && !differs; x += 3) differs = with.GetPixel(x, y) != without.GetPixel(x, y);
-                Check(differs, "stream window follows the comment field settings");
+                Check(differs, "stream window follows its own field settings");
             }
         }
-        FormMain.UserConfig.CommentShowNumber = showNumber;
+        FormMain.UserConfig.StreamShowNumber = showNumber;
         var defaults = new UserConfig();
         Check(defaults.CommentFontName == "MS PGothic" && defaults.StreamFontName == "GenEi M Gothic v2 Black" && defaults.StreamFontSize == 24 && defaults.CommentFontSize == 12 && defaults.CommentShowTime && defaults.CommentSeparators, "comment view defaults to MS PGothic and stream comments to the bundled font");
         string streamFont = FormMain.UserConfig.StreamFontName;

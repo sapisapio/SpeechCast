@@ -56,7 +56,7 @@ namespace SpeechCastMe
             InitializeAudioUi();
             SetIconButton(toolStripButtonBorder, "frame", "テロップの位置調整枠 ON / OFF");
             SetIconButton(toolStripButtonSettings, "settings", "設定");
-            SetIconButton(toolStripButtonOpenResCaptionForm, "altcaption", "代替字幕を開く");
+            SetIconButton(toolStripButtonOpenResCaptionForm, "altcaption", "テロップ入力の表示切替");
             toolStripLabel3.Text = "音量";
             toolStripLabel8.Text = "着信音量";
             toolStripComboBoxSelectVoice.Width = 132;
@@ -66,7 +66,7 @@ namespace SpeechCastMe
             var appearance = new ToolStripDropDownButton("表示") { DisplayStyle = ToolStripItemDisplayStyle.Text };
             AddAppearanceItem(appearance, "1行モード（項目と本文を横並び）", "one", null);
             AddAppearanceItem(appearance, "2行モード（項目の下に本文）", "two", null);
-            appearance.DropDownItems.Add("表示項目・フォント…", null, delegate { ShowReaderAppearance(); });
+            appearance.DropDownItems.Add("表示項目・フォント…", null, delegate { ShowSettings("表示"); });
             var separators = new ToolStripMenuItem("レスの区切り線");
             separators.Click += delegate { if (UserConfig == null) return; UserConfig.CommentSeparators = !UserConfig.CommentSeparators; ApplyReaderAppearance(); };
             appearance.DropDownOpening += delegate { separators.Checked = UserConfig != null && UserConfig.CommentSeparators; };
@@ -89,19 +89,38 @@ namespace SpeechCastMe
                 }
             });
             appearance.DropDownItems.Add(new ToolStripSeparator());
-            appearance.DropDownItems.Add("配信コメント  (F11)", null, delegate { ToggleStreamMode(); });
+            appearance.DropDownItems.Add("配信コメント", null, delegate { ToggleStreamMode(); });
+            var streamLook = new ToolStripMenuItem("配信コメントの表示設定");
+            AddStreamLookItems(streamLook.DropDownItems, streamLook.DropDown);
+            appearance.DropDownItems.Add(streamLook);
             var autoScroll = new ToolStripMenuItem("自動送り");
             autoScroll.Click += delegate { toolStripButtonAutoScroll.PerformClick(); };
             appearance.DropDownOpening += delegate { autoScroll.Checked = UserConfig != null && UserConfig.AutoAdvance; };
             appearance.DropDownItems.Add(autoScroll);
-            appearance.DropDownItems.Add("レス一覧の表示切替", null, delegate { toolStripButtonListToggle.PerformClick(); });
-            appearance.DropDownItems.Add("代替字幕を開く", null, delegate { openResCaptionForm(); });
+            // (The old table of replies beside the view is no longer offered.)
+            appearance.DropDownItems.Add("テロップ入力の表示切替", null, delegate { openResCaptionForm(); });
             menuStrip1.Items.Add(appearance);
+            // Left: 掲示板を開く 表示 ヘルプ (right: 配信コメント 表示設定). 読み上げ only repeated the
+            // toolbar's reading buttons (and clipboard reading, now dropped), so it is gone.
+            toolStripMenuItemSpeech.Available = false;
+            menuStrip1.Items.Remove(toolStripMenuItemHelp);
+            menuStrip1.Items.Insert(menuStrip1.Items.IndexOf(appearance) + 1, toolStripMenuItemHelp);
             InitializeOpenBoardUi();
+            // The SpeechCastMe support links do not apply to this fork; ヘルプ keeps バージョン情報.
+            toolStripMenuItemGoSupportBBS.Available = false;
+            toolStripMenuItemGoLatestRelease.Available = false;
+            toolStripSeparator3.Available = false;
             // Stream comments: a separate transparent window for OBS window capture.
             streamButton = new ToolStripButton("配信コメント") { Name = "streamModeButton", Alignment = ToolStripItemAlignment.Right,
-                DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信用のコメント窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）  F11" };
+                DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信用のコメント窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）" };
             streamButton.Click += delegate { ToggleStreamMode(); };
+            // 表示設定 right of 配信コメント: skins, size, fields, in the main window (a menu opened from the
+            // overlay's hover bar closes at once, since that bar never takes focus).
+            var streamLookButton = new ToolStripDropDownButton("表示設定") { Name = "streamLookButton", Alignment = ToolStripItemAlignment.Right,
+                DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信コメントのスキン・文字サイズ・表示項目・新着の表示", Margin = new Padding(0, 0, 2, 0) };
+            AddStreamLookItems(streamLookButton.DropDownItems, streamLookButton.DropDown);
+            streamLookButton.DropDownDirection = ToolStripDropDownDirection.BelowLeft;
+            menuStrip1.Items.Add(streamLookButton); // right-aligned items are laid out right to left
             menuStrip1.Items.Add(streamButton);
             InitializeTelopUi();
 
@@ -128,7 +147,7 @@ namespace SpeechCastMe
             toolStripTextBoxThreadKeyword.AutoSize = false;
             toolStripTextBoxThreadKeyword.Width = 100;
             myToolStripUrl.Layout += delegate {
-                int available = myToolStripUrl.ClientSize.Width - myToolStripUrl.Padding.Horizontal - 28 - feedModeSelector.Width - feedModeSelector.Margin.Horizontal;
+                int available = myToolStripUrl.ClientSize.Width - myToolStripUrl.Padding.Horizontal - 28;
                 if (UserConfig != null && UserConfig.JpnknBoardMode)
                 {
                     toolStripLabel7.Available = false;
@@ -147,9 +166,9 @@ namespace SpeechCastMe
             toolStripTextBoxThreadKeyword.ToolTipText = "次スレキーワード";
             webBrowser.IsWebBrowserContextMenuEnabled = false;
             var context = new ContextMenuStrip();
-            context.Items.Add("配信コメント  (F11)", null, delegate { ToggleStreamMode(); });
+            context.Items.Add("配信コメント", null, delegate { ToggleStreamMode(); });
             context.Items.Add("最新レスへ", null, delegate { toolStripButtonMoveBottom.PerformClick(); });
-            context.Items.Add("表示項目・フォント…", null, delegate { ShowReaderAppearance(); });
+            context.Items.Add("表示項目・フォント…", null, delegate { ShowSettings("表示"); });
             webBrowser.ContextMenuStrip = context;
             webBrowser.DocumentCompleted += delegate { ApplyReaderAppearance(); };
             Shown += delegate { FinishReaderUi(); };
@@ -230,6 +249,7 @@ namespace SpeechCastMe
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setZoom", new object[] { 1 });
             ApplyReaderAppearance();
             SyncTelopUi(); // settings are loaded by now
+            ApplyHotkeys();
             BeginInvoke(new Action(OpenLastOnStartup));
         }
 
@@ -246,7 +266,6 @@ namespace SpeechCastMe
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (keyData == Keys.F11) { ToggleStreamMode(); return true; }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 

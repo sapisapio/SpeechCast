@@ -35,6 +35,9 @@ namespace SpeechCastMe
             Resize += delegate { renderedKey = null; RenderIfChanged(); };
         }
 
+        // Animated overlays check more often while something moves.
+        protected void SetRefreshInterval(int milliseconds) { if (refresh.Interval != milliseconds) refresh.Interval = milliseconds; }
+
         // A string that changes whenever the picture must be redrawn; null skips drawing.
         protected abstract string RenderKey();
         protected abstract Bitmap Render(Size size);

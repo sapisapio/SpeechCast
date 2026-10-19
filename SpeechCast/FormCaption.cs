@@ -183,16 +183,21 @@ namespace SpeechCastMe
         {
             var caption = FormCaption.Instance;
             if (!caption.borderVisible && FormMain.UserConfig.HideCaptionTitle) { caption.drawRect = Rectangle.Empty; return; }
+            var config = FormMain.UserConfig;
             using (var font = new Font("Yu Gothic UI", 9F, FontStyle.Regular))
             using (var format = new StringFormat(StringFormat.GenericTypographic) { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-            using (var background = new SolidBrush(Color.FromArgb(235, 31, 41, 55)))
-            using (var foreground = new SolidBrush(Color.FromArgb(238, 242, 247)))
+            using (var background = new SolidBrush(Color.FromArgb(235, FormFreeTelop.ParseColor(config.CaptionTitleBack, Color.FromArgb(31, 41, 55)))))
+            using (var foreground = new SolidBrush(FormFreeTelop.ParseColor(config.CaptionTitleText, Color.FromArgb(238, 242, 247))))
+            using (var border = new Pen(FormFreeTelop.ParseColor(config.CaptionTitleBorder, Color.White)))
             {
                 string label = caption.titleText;
                 int available = Math.Max(1, caption.ClientSize.Width - 8);
                 int width = Math.Min(available, (int)Math.Ceiling(e.Graphics.MeasureString(label, font, new SizeF(100000, 1000), format).Width) + 8);
                 caption.drawRect = new Rectangle(4, 3, width, (int)Math.Ceiling(font.GetHeight(e.Graphics)) + 4);
                 e.Graphics.FillRectangle(background, caption.drawRect);
+                // A thin edge keeps the dark band findable over dark scenes.
+                if (config.CaptionTitleBorderOn)
+                    e.Graphics.DrawRectangle(border, caption.drawRect.X, caption.drawRect.Y, caption.drawRect.Width - 1, caption.drawRect.Height - 1);
                 var textRect = caption.drawRect;
                 textRect.Inflate(-4, 0);
                 e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;

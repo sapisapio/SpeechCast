@@ -13,6 +13,13 @@ namespace SpeechCastMe
         private ToolStripComboBox audioModeSelector;
         private bool syncingAudioMode;
         private DateTime audioMessageUntil;
+        // In AudioNotificationMode order.
+        internal static readonly object[] AudioModeNames = { "読み上げ", "着信音", "無音", "読み上げ＋着信音" };
+
+        private bool AudioSpeaks { get { return UserConfig.AudioMode == AudioNotificationMode.Speech || UserConfig.AudioMode == AudioNotificationMode.SpeechAndSound; } }
+        private bool AudioRings { get { return UserConfig.AudioMode == AudioNotificationMode.Sound || UserConfig.AudioMode == AudioNotificationMode.SpeechAndSound; } }
+        // 読み上げ＋着信音: the reading waits until the sound has finished.
+        private bool WaitingForSound { get { return UserConfig != null && UserConfig.AudioMode == AudioNotificationMode.SpeechAndSound && notificationPlayer.IsBusy; } }
 
         private void ShowAudioMessage(string message)
         {
@@ -26,15 +33,15 @@ namespace SpeechCastMe
             foreach (var item in new ToolStripItem[] { toolStripButtonSpeech, toolStripButtonPlaySoundNewResponse, toolStripButtonClickSound })
                 myToolStripVoice.Items.Remove(item);
             audioModeSelector = new ToolStripComboBox { Name = "audioModeSelector", DropDownStyle = ComboBoxStyle.DropDownList,
-                AutoSize = false, Width = 80, ToolTipText = "通知方法：読み上げ / 着信音 / 無音" };
-            audioModeSelector.Items.AddRange(new object[] { "読み上げ", "着信音", "無音" });
+                AutoSize = false, Width = 112, ToolTipText = "通知方法：読み上げ / 着信音 / 無音 / 読み上げ＋着信音（鳴り終わってから読む）" };
+            audioModeSelector.Items.AddRange(AudioModeNames);
             myToolStripVoice.Items.Insert(0, audioModeSelector);
             audioModeSelector.SelectedIndexChanged += delegate {
                 if (syncingAudioMode || UserConfig == null || audioModeSelector.SelectedIndex < 0) return;
                 UserConfig.AudioMode = (AudioNotificationMode)audioModeSelector.SelectedIndex;
                 notificationPlayer.Stop();
                 SyncAudioModeUi();
-                if (UserConfig.AudioMode == AudioNotificationMode.Sound && !UserConfig.NewResponseSoundFilePathes.Any(File.Exists))
+                if (AudioRings && !UserConfig.NewResponseSoundFilePathes.Any(File.Exists))
                     ShowAudioMessage("設定 → 着信音 で音声ファイルを登録してください");
             };
             notificationPlayer.Failed += message => { ShowAudioMessage("着信音：" + message); AddLog("Notification: {0}", message); };
@@ -48,8 +55,8 @@ namespace SpeechCastMe
             syncingAudioMode = true;
             audioModeSelector.SelectedIndex = (int)UserConfig.AudioMode;
             syncingAudioMode = false;
-            bool speech = UserConfig.AudioMode == AudioNotificationMode.Speech;
-            bool sound = UserConfig.AudioMode == AudioNotificationMode.Sound;
+            bool speech = AudioSpeaks;
+            bool sound = AudioRings;
             toolStripComboBoxSelectVoice.Enabled = speech;
             toolStripTextBoxVoiceVolume.Enabled = toolStripTrackBarVoiceVolume.Enabled = speech;
             toolStripTextBoxPlayVolume.Enabled = toolStripTrackBarPlayVolume.Enabled = sound;
@@ -62,7 +69,7 @@ namespace SpeechCastMe
         // manual replays and updates without new replies do not produce a sound.
         private void NotifyNewResponses(bool next, int previousCount, int currentCount)
         {
-            if (!next || currentCount <= previousCount || UserConfig.AudioMode != AudioNotificationMode.Sound || IsDesignPreview) return;
+            if (!next || currentCount <= previousCount || !AudioRings || IsDesignPreview) return;
             if (notificationPlayer.IsBusy) return;
             var files = UserConfig.NewResponseSoundFilePathes.Where(File.Exists).ToArray();
             if (files.Length == 0)

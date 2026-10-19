@@ -276,12 +276,12 @@ namespace SpeechCastMe
         private async void GetFromURL()
         {
             if (loadingThread || !endWebRequest) return;
-            if (UserConfig.JpnknBoardMode)
+            if (UserConfig.JpnknBoardMode && IsJpnknInput(toolStripTextBoxURL.Text))
             {
                 JpnknFastTarget target;
                 if (!JpnknFastTarget.TryParse(toolStripTextBoxURL.Text, true, out target))
                 {
-                    MessageBox.Show(this, "jpnknの掲示板URLまたは板IDを入力してください。", "板全体 Fast");
+                    MessageBox.Show(this, "jpnknの掲示板URLまたは板IDを入力してください。", "Fast板全部");
                     return;
                 }
                 StopSpeakingCore(); AutoUpdate = false;
@@ -290,7 +290,7 @@ namespace SpeechCastMe
             }
             if (CheckBaseURL() && !ShowFormBBSThreads()) return;
             loadingThread = true;
-            feedModeSelector.Enabled = toolStripTextBoxURL.Enabled = false;
+            fastModeButton.Enabled = toolStripTextBoxURL.Enabled = false;
             bool wasBoardFeed = IsFastBoardFeed;
             StopSpeakingCore(); AutoUpdate = false; ClearFastSession();
             if (wasBoardFeed) oldUrl = null; // A board feed is not a thread history.
@@ -304,14 +304,41 @@ namespace SpeechCastMe
             finally
             {
                 loadingThread = false;
-                if (!IsDisposed) feedModeSelector.Enabled = toolStripTextBoxURL.Enabled = !IsDesignPreview;
+                if (!IsDisposed) fastModeButton.Enabled = toolStripTextBoxURL.Enabled = !IsDesignPreview;
             }
+        }
+
+        private static readonly Dictionary<string, int> jbbsThreadStops = new Dictionary<string, int>();
+
+        // The board's own limit from setting.cgi; 1000 when it cannot be read. Without it threads
+        // on 5000-reply boards stopped updating (and ringing) at 1000.
+        private async Task<int> JbbsThreadStop(string host, string dir, string bbs)
+        {
+            string key = host + "/" + dir + "/" + bbs;
+            int stop;
+            if (jbbsThreadStops.TryGetValue(key, out stop)) return stop;
+            stop = 1000;
+            try
+            {
+                using (var client = new System.Net.WebClient())
+                {
+                    if (!UserConfig.UseDefaultProxy) client.Proxy = null;
+                    byte[] data = await client.DownloadDataTaskAsync(host + "/bbs/api/setting.cgi/" + dir + "/" + bbs + "/");
+                    var found = Regex.Match(Encoding.GetEncoding("EUC-JP").GetString(data), @"BBS_THREAD_STOP=(\d+)");
+                    int parsed;
+                    if (found.Success && int.TryParse(found.Groups[1].Value, out parsed) && parsed > 0) stop = parsed;
+                }
+            }
+            catch (Exception ex) { AddLog("jbbs setting: {0}", ex.Message); }
+            jbbsThreadStops[key] = stop;
+            AddLog("jbbs thread stop: {0} {1}", key, stop);
+            return stop;
         }
 
         private async Task GetFromURLNext()
         {
             this.endWebRequest = false;
-            feedModeSelector.Enabled = false;
+            fastModeButton.Enabled = false;
             try
             {
                 if (fastTarget != null && !IsFastBoardFeed)
@@ -331,7 +358,7 @@ namespace SpeechCastMe
             {
                 this.endWebRequest = true;
                 DrainFastMessages();
-                if (!IsDisposed) feedModeSelector.Enabled = !IsDesignPreview && !loadingThread;
+                if (!IsDisposed) fastModeButton.Enabled = !IsDesignPreview && !loadingThread;
             }
         }
        
@@ -479,6 +506,7 @@ namespace SpeechCastMe
                     AddLog("jbbs rawmode: {0} {1}", rawURL, threadId);
                     Response.Style = Response.BBSStyle.jbbs;
                     encodingName = "EUC-JP";
+                    Response.JbbsThreadStop = await JbbsThreadStop(m.Groups[1].Value, m.Groups[3].Value, m.Groups[4].Value);
 
                     baseURL = string.Format("{0}/{1}/{2}/", m.Groups[1], m.Groups[3], m.Groups[4]);
                 }
@@ -1540,7 +1568,7 @@ namespace SpeechCastMe
                             writer.WriteLine(LogText);
 
                         }
-                        System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+                        // No wait after clearing: this runs on the UI timer and a sleep froze the window.
 
                         fileNameIndex++;
 
@@ -1557,6 +1585,11 @@ namespace SpeechCastMe
                         communicationStatusString = string.Format("取得中・・・");
                     }
                     // レス取得が終わっていて、かつ読み上げ対象レスがなければ、次のレス取得までのカウントダウンをステータスに表示
+                    // Fast delivers new replies itself; there is no next fetch to count down to.
+                    else if (CurrentResNumber > responses.Count && fastTarget != null && (IsFastBoardFeed || fastConnected))
+                    {
+                        communicationStatusString = "";
+                    }
                     else if (CurrentResNumber > responses.Count)
                     {
                         int leftSeconds = (UserConfig.AutoGettingWebInvervalMillsec - (int)diffWeb.TotalMilliseconds) / 1000 + 1;
@@ -1603,6 +1636,7 @@ namespace SpeechCastMe
             if (
                 !isSpeaking
                 && timerTickEnabled
+                && !WaitingForSound
                )
             {
                 // 読み上げボイスステータスの設定
@@ -1896,6 +1930,7 @@ namespace SpeechCastMe
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            UserConfig.StreamOverlayOpen = IsStreamMode;
             ExitStreamMode(); // saves the stream window bounds before settings are written
             CloseTelopWindow();
             CloseGadgets(); // saves the gadget window bounds
@@ -1919,19 +1954,27 @@ namespace SpeechCastMe
 
         FormSettings formSettings = null;
 
-        private void toolStripButtonSettings_Click(object sender, EventArgs e)
+        private void toolStripButtonSettings_Click(object sender, EventArgs e) { ShowSettings(null); }
+
+        // The one settings dialog; tab picks the page to open (表示, 配信コメント, ガジェット ...).
+        internal void ShowSettings(string tab)
         {
             formSettings = new FormSettings();
             try
             {
                 formSettings.SetUserConfig(UserConfig);
-                if (formSettings.ShowDialog() == DialogResult.OK)
+                if (tab != null) formSettings.SelectTab(tab);
+                if (formSettings.ShowDialog(this) == DialogResult.OK)
                 {
                     formSettings.GetUserConfig(UserConfig);
                     if (!UserConfig.AutoReloadAlertCaption) CaptionTextBuffer = "";
                     FormCaption.Instance.Refresh();
                     notificationPlayer.Stop();
                     SyncAudioModeUi();
+                    ApplyReaderAppearance();
+                    RefreshStream();
+                    RefreshGadgets();
+                    ApplyHotkeys();
                 }
             }
             finally

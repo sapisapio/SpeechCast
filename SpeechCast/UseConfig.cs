@@ -7,12 +7,17 @@ using System.Text.RegularExpressions;
 
 namespace SpeechCastMe
 {
-    public enum AudioNotificationMode { Speech, Sound, Silent }
+    // SpeechAndSound: the sound first, then the reading (SpeechCastMe could do both). Appended to keep stored indices.
+    public enum AudioNotificationMode { Speech, Sound, Silent, SpeechAndSound }
 
     public class UserConfig
     {
         // UI refresh preferences, 2026-10-18.
         public bool JpnknBoardMode = false;
+        // Shortcut keys (global hotkeys), off by default; entries "action=keys", see FormMain.HotkeyActions.
+        public bool HotkeysEnabled = false;
+        public List<string> Hotkeys = new List<string>();
+        public bool JpnknHttpOnly = false; // jpnkn threads without Fast (従来の方式)
         // Reopen the last board or thread at start-up (auto update turns on after loading).
         public bool OpenLastOnStartup = true;
         public string CommentLayout = "compact";
@@ -97,7 +102,7 @@ namespace SpeechCastMe
         /// </summary>
         public void SupplementSettings()
         {
-            AudioMode = AudioMode; // Normalize legacy simultaneous speech/sound flags.
+            AudioMode = AudioMode; // Both legacy flags on now means 読み上げ＋着信音.
             NavigationSound = false;
             PlaySoundNewResponseSync = false;
             PlaySoundNewResevery = false;
@@ -142,6 +147,15 @@ namespace SpeechCastMe
         /// 配信モードのコメントウィンドウの位置と大きさ
         /// </summary>
         public Rectangle StreamOverlayBounds;
+        public bool StreamOverlayOpen; // reopen the stream comments window at start-up
+        public string StreamTemplate = "outline"; // see StreamTemplates.Catalog
+        public bool StreamIntro = true;          // new comments slide in
+        // Fields above each stream comment, apart from the comment view's own.
+        public bool StreamShowNumber = false;
+        public bool StreamShowName = true;
+        public bool StreamShowDate = false;
+        public bool StreamShowTime = true;
+        public bool StreamShowID = false;
 
         /// <summary>
         /// 自由テロップの窓の位置と大きさ・フォント（文字は CaptionTextBuffer）
@@ -149,6 +163,17 @@ namespace SpeechCastMe
         public Rectangle TelopBounds;
         public string TelopFontName = BundledFont.FamilyName;
         public int TelopFontSize = 40;
+
+        /// <summary>
+        /// テロップ左上のスレッド名：帯・文字・枠線の色と、枠線の有無
+        /// </summary>
+        public string CaptionTitleBack = "#1F2937";
+        public string CaptionTitleText = "#EEF2F7";
+        public string CaptionTitleBorder = "#FFFFFF";
+        public bool CaptionTitleBorderOn = true;
+        public string TelopTextColor = "#FFFFFF";    // inside of the letters
+        public string TelopOutlineColor = "#000000"; // the outline
+        public int TelopOutlineWidth = 3;            // px, 0 = no outline
 
         /// <summary>
         /// ガジェット（時計・タイマー）の窓の位置と大きさ、色（アプリのテーマとは別）、タイマーの設定
@@ -217,11 +242,11 @@ namespace SpeechCastMe
         [System.Xml.Serialization.XmlIgnore]
         public AudioNotificationMode AudioMode
         {
-            get { return SpeakMode ? AudioNotificationMode.Speech : PlaySoundNewResponse ? AudioNotificationMode.Sound : AudioNotificationMode.Silent; }
+            get { return SpeakMode && PlaySoundNewResponse ? AudioNotificationMode.SpeechAndSound : SpeakMode ? AudioNotificationMode.Speech : PlaySoundNewResponse ? AudioNotificationMode.Sound : AudioNotificationMode.Silent; }
             set
             {
-                SpeakMode = value == AudioNotificationMode.Speech;
-                PlaySoundNewResponse = value == AudioNotificationMode.Sound;
+                SpeakMode = value == AudioNotificationMode.Speech || value == AudioNotificationMode.SpeechAndSound;
+                PlaySoundNewResponse = value == AudioNotificationMode.Sound || value == AudioNotificationMode.SpeechAndSound;
             }
         }
 

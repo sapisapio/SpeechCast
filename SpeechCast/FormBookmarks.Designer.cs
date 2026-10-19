@@ -209,7 +209,7 @@
             // 
             this.toolStripMenuItemAddBookmak.Name = "toolStripMenuItemAddBookmak";
             this.toolStripMenuItemAddBookmak.Size = new System.Drawing.Size(159, 22);
-            this.toolStripMenuItemAddBookmak.Text = "ブックマークの追加";
+            this.toolStripMenuItemAddBookmak.Text = "掲示板を登録";
             this.toolStripMenuItemAddBookmak.Click += new System.EventHandler(this.toolStripMenuItemAddBookmak_Click);
             // 
             // toolStripMenuItemAddFolder
@@ -242,7 +242,7 @@
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "ブックマーク編集";
+            this.Text = "掲示板リストの編集";
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             this.splitContainer1.Panel1.ResumeLayout(false);
