@@ -8,7 +8,7 @@ namespace SpeechCastMe.Controls
     class ToolStripTrackBar : ToolStripControlHost
     {
         public ToolStripTrackBar()
-            : base(new TrackBar())
+            : base(new ThemedTrackBar())
         {
             this.AutoSize = false;
             this.TrackBar.AutoSize = false;

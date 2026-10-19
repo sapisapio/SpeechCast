@@ -230,6 +230,11 @@
     <Compile Include="OneCoreVoices.cs" />
     <Compile Include="SpeechEngine.cs" />
     <Compile Include="ToolbarIcons.cs" />
+    <Compile Include="WindowTheme.cs" />
+    <Compile Include="FormMain.Theme.cs" />
+    <Compile Include="FormMain.StatusBar.cs" />
+    <Compile Include="Controls\ThemedTrackBar.cs" />
+    <Compile Include="Controls\ComboChrome.cs" />
     <Compile Include="NotificationSoundPlayer.cs" />
     <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />

@@ -977,9 +977,9 @@ namespace SpeechCastMe
         private void CompleteThreadLoad(bool success)
         {
             if (!success) return;
-            // Initial loads start at the newest response, never replaying the backlog.
+            // Initial loads read nothing already posted: with no reply selected, reading
+            // starts at the next new reply (the last one is not news when a thread opens).
             foreach (ListViewItem item in listViewResponses.SelectedItems) item.Selected = false;
-            if (listViewResponses.Items.Count > 0) listViewResponses.Items[listViewResponses.Items.Count - 1].Selected = true;
             AutoUpdate = true;
         }
 

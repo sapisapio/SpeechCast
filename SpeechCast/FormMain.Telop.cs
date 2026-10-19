@@ -42,7 +42,7 @@ namespace SpeechCastMe
             SetIconButton(larger, "zoomin", "テロップの文字を大きく（1px）");
             larger.Click += delegate { ChangeTelopSize(1); };
             telopFontButton = new ToolStripDropDownButton { Name = "telopFont", ToolTipText = "テロップのフォント" };
-            telopFontButton.Image = ToolbarIcons.Create("font", ToolbarIconSize);
+            telopFontButton.Image = CreateThemedIcon(telopFontButton, "font");
             telopFontButton.ImageScaling = ToolStripItemImageScaling.None;
             telopFontButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             telopFontButton.DropDownItems.Add("源暎エムゴ v2 Black（内蔵）", null, delegate { UserConfig.TelopFontName = BundledFont.FamilyName; SyncTelopUi(); });

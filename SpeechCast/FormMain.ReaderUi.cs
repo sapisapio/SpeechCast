@@ -74,10 +74,10 @@ namespace SpeechCastMe
             appearance.DropDownItems.Add(new ToolStripSeparator());
             AddAppearanceItem(appearance, "明るい背景", null, "light");
             AddAppearanceItem(appearance, "暗い背景", null, "dark");
-            AddAppearanceItem(appearance, "ペーパー", null, "paper");
-            appearance.DropDownItems.Add("背景色を選ぶ…", null, delegate {
+            // The theme color sets the comment background and tints the whole window to match.
+            appearance.DropDownItems.Add("テーマカラーを選ぶ…", null, delegate {
                 if (UserConfig == null) return;
-                using (var dialog = new ColorDialog { FullOpen = true })
+                using (var dialog = new ColorDialog { FullOpen = true, Color = string.IsNullOrEmpty(UserConfig.CommentBackground) ? windowTheme.Window : ColorTranslator.FromHtml(UserConfig.CommentBackground) })
                 {
                     if (dialog.ShowDialog(this) == DialogResult.OK)
                     {
@@ -105,6 +105,7 @@ namespace SpeechCastMe
             menuStrip1.Items.Add(streamButton);
             InitializeTelopUi();
 
+            statusStrip1.Renderer = toolbarRenderer;
             foreach (var strip in new ToolStrip[] { myToolStripVoice, myToolStripPlay, myToolStripBrowser, myToolStripUrl, menuStrip1 })
             {
                 strip.Font = new Font("Yu Gothic UI", 9F);
@@ -118,6 +119,7 @@ namespace SpeechCastMe
             myToolStripUrl.Items.AddRange(new ToolStripItem[] { toolStripTextBoxURL, toolStripLabel7, toolStripTextBoxThreadKeyword, toolStripButtonAutoNextThread });
             InitializeFastUi();
             InitializeReadingUi();
+            InitializeStatusBar();
             toolStripLabel7.Text = "次スレキーワード";
             toolStripButtonAutoNextThread.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonAutoNextThread.ToolTipText = "次スレへ自動移動 ON / OFF";
@@ -171,10 +173,10 @@ namespace SpeechCastMe
             button.Padding = new Padding(4, 0, 6, 0);
         }
 
-        private static void SetIconButton(ToolStripButton button, string icon, string description)
+        private void SetIconButton(ToolStripButton button, string icon, string description)
         {
             if (button.Image != null && button.Tag as string == "reader-icon") button.Image.Dispose();
-            button.Image = ToolbarIcons.Create(icon, ToolbarIconSize);
+            button.Image = CreateThemedIcon(button, icon);
             button.Tag = "reader-icon";
             button.ImageScaling = ToolStripItemImageScaling.None;
             button.Text = description;
@@ -204,7 +206,9 @@ namespace SpeechCastMe
 
         private void ApplyReaderAppearance()
         {
-            if (UserConfig == null || webBrowser.Document == null) return;
+            if (UserConfig == null) return;
+            ApplyWindowTheme();
+            if (webBrowser.Document == null) return;
             webBrowser.Document.InvokeScript("setAppearance", new object[] {
                 UserConfig.CommentLayout ?? "one", UserConfig.CommentTheme ?? "light", UserConfig.CommentBackground ?? "",
                 UserConfig.CommentFontSize, UserConfig.CommentFontName,
@@ -221,6 +225,7 @@ namespace SpeechCastMe
             // Font size now uses native pixels; old fractional CSS zoom blurred small glyphs.
             if (UserConfig != null) UserConfig.magnification = 1;
             if (UserConfig != null && UserConfig.CommentLayout == "plain") { UserConfig.CommentLayout = "one"; UserConfig.CommentShowNumber = false; }
+            if (UserConfig != null && UserConfig.CommentTheme == "paper") UserConfig.CommentTheme = "light"; // the paper theme was removed
             if (UserConfig != null && UserConfig.CommentLayout == "named") { UserConfig.CommentLayout = "two"; UserConfig.CommentShowName = true; }
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setZoom", new object[] { 1 });
             ApplyReaderAppearance();

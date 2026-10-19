@@ -13,21 +13,22 @@ body.no-lines .comment{border-bottom-color:transparent}
 .field{display:none;margin-right:7px}
 .show-number .number,.show-name .author,.show-date .date,.show-time .time,.show-id .identity{display:inline}
 .body{white-space:pre-wrap}
+/* One-line layout: the fields form a column and every line of the body starts at the same place. */
+.one-line .comment{display:flex;align-items:baseline}.one-line .source-thread,.one-line .meta{flex:none;white-space:nowrap}.one-line .body{flex:1 1 0%;min-width:0}
 /* Two-line layout: a grey header bar like the classic 2ch view, body slightly indented, tight spacing. */
 .two-line .meta{display:block;line-height:1.4;margin:0 -8px 2px;padding:1px 8px;background:rgba(0,0,0,.15)}.two-line .body{display:block;padding-left:1.2em}body.dark.two-line .meta{background:rgba(255,255,255,.12)}
 .no-fields .meta{display:none}
 a{color:#2877b7;text-decoration:none}a:hover{text-decoration:underline}
-body.dark{background:#171d26;color:#edf1f7}
+body.dark{background:#171d26;color:#edf1f7}html.dark{scrollbar-face-color:#3a4554;scrollbar-track-color:#171d26;scrollbar-arrow-color:#a8b7ca;scrollbar-shadow-color:#3a4554;scrollbar-highlight-color:#3a4554;scrollbar-3dlight-color:#171d26;scrollbar-darkshadow-color:#171d26}
 body.dark .comment{border-color:#323c4b}
 body.dark .meta{color:#a8b7ca}body.dark a{color:#82bbfa}
-body.paper{background:#f5f0e6;color:#3f3a32}body.paper .comment{border-color:#ded5c5}
 .number{color:#0000ff;text-decoration:underline}.number.ref1{color:#800080}.number.ref3{color:#ff0000}
 .author{color:#008000}.author.mail{color:#0000ff}.author.sage{color:#800080}
 .date,.time{color:#800080}.identity{color:#000}.identity.id2{color:#0000ff}.identity.id5{color:#ff0000}.identity .count{margin-left:2px}
 body.dark .number{color:#7aa7ff}body.dark .number.ref1{color:#d69cff}body.dark .number.ref3{color:#ff7070}
 body.dark .author{color:#6fd27d}body.dark .author.mail{color:#7aa7ff}body.dark .author.sage{color:#d69cff}
 body.dark .date,body.dark .time{color:#d69cff}body.dark .identity{color:#edf1f7}body.dark .identity.id2{color:#7aa7ff}body.dark .identity.id5{color:#ff7070}
-.comment{cursor:pointer}.comment.current{background:#fff1b8;box-shadow:inset 3px 0 0 #deb234}body.dark .comment.current{background:#4a3f16}body.paper .comment.current{background:#f3e2a6}
+.comment{cursor:pointer}.comment.current{background:#fff1b8;box-shadow:inset 3px 0 0 #deb234}body.dark .comment.current{background:#4a3f16}
 </style>
 <script>
 function scrollRoot(){return document.scrollingElement||(document.compatMode==='CSS1Compat'?document.documentElement:document.body);}
@@ -65,6 +66,7 @@ function setZoom(value){var area=document.getElementById('resArea'),next=String(
 function getResTop(number){var nodes=document.getElementsByName('res'+number);return nodes.length?Math.round(nodes[0].getBoundingClientRect().top+scrollTop()):scrollTop();}
 function setAppearance(layout,theme,background,fontSize,fontName,number,name,date,time,id,lines){
  var saved=anchorSnapshot(),fields=(number?' show-number':'')+(name?' show-name':'')+(date?' show-date':'')+(time?' show-time':'')+(id?' show-id':'');
+ document.documentElement.className=theme==='dark'?'dark':'';
  document.body.className=(layout==='named'||layout==='two'?'two-line':'one-line')+' '+theme+fields+(fields?'':' no-fields')+(lines===false?' no-lines':'');
  document.body.style.backgroundColor=background||'';
  document.body.style.fontSize=Math.max(10,Math.min(40,Number(fontSize)||16))+'px';

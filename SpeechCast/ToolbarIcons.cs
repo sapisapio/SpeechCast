@@ -15,10 +15,15 @@ namespace SpeechCastMe
         // Icons are designed on a 20 x 20 grid and scaled to the requested size.
         internal static Bitmap Create(string name, int size)
         {
+            return Create(name, size, Ink);
+        }
+
+        internal static Bitmap Create(string name, int size, Color ink)
+        {
             var bitmap = new Bitmap(size, size);
             using (var g = Graphics.FromImage(bitmap))
-            using (var pen = new Pen(Ink, 1.7F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (var brush = new SolidBrush(Ink))
+            using (var pen = new Pen(ink, 1.7F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (var brush = new SolidBrush(ink))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
@@ -81,7 +86,7 @@ namespace SpeechCastMe
                 case "zoomout":
                 case "zoomin":
                     g.DrawEllipse(pen, 3F, 3F, 10.5F, 10.5F);
-                    using (var handle = new Pen(Ink, 2.4F) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawLine(handle, 12.2F, 12.2F, 16.8F, 16.8F);
+                    using (var handle = new Pen(pen.Color, 2.4F) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawLine(handle, 12.2F, 12.2F, 16.8F, 16.8F);
                     g.DrawLine(pen, 5.6F, 8.25F, 10.9F, 8.25F);
                     if (name == "zoomin") g.DrawLine(pen, 8.25F, 5.6F, 8.25F, 10.9F);
                     break;
@@ -104,7 +109,7 @@ namespace SpeechCastMe
                         new PointF(8.2F, 17.5F), new PointF(15.2F, 8.6F), new PointF(10.7F, 8.6F) });
                     break;
                 case "frame":
-                    using (var dashed = new Pen(Ink, 1.4F) { DashPattern = new[] { 2F, 1.6F } }) g.DrawRectangle(dashed, 4F, 4F, 12F, 12F);
+                    using (var dashed = new Pen(pen.Color, 1.4F) { DashPattern = new[] { 2F, 1.6F } }) g.DrawRectangle(dashed, 4F, 4F, 12F, 12F);
                     foreach (var corner in new[] { new PointF(2.5F, 2.5F), new PointF(14.5F, 2.5F), new PointF(2.5F, 14.5F), new PointF(14.5F, 14.5F) })
                         g.FillRectangle(brush, corner.X, corner.Y, 3F, 3F);
                     break;
@@ -167,20 +172,90 @@ namespace SpeechCastMe
 
         public ReaderToolbarRenderer() { RoundedEdges = false; }
 
-        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e) { }
+        // The window theme's colors; null falls back to the stock professional look.
+        internal WindowTheme Palette { get; set; }
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            if (Palette == null || !(e.ToolStrip is ToolStripDropDown)) return;
+            using (var pen = new Pen(Palette.Border))
+                e.Graphics.DrawRectangle(pen, 0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
+        }
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
+            if (Palette != null && e.ToolStrip is ToolStripDropDown)
+            {
+                int y = e.Item.Height / 2;
+                using (var line = new Pen(Palette.Border)) e.Graphics.DrawLine(line, 28, y, e.Item.Width - 4, y);
+                return;
+            }
             if (!e.Vertical || e.ToolStrip is ToolStripDropDown) { base.OnRenderSeparator(e); return; }
             int x = e.Item.Width / 2;
-            using (var pen = new Pen(Color.FromArgb(160, 174, 192)))
+            using (var pen = new Pen(Palette != null ? Palette.Separator : Color.FromArgb(160, 174, 192)))
                 e.Graphics.DrawLine(pen, x, 5, x, e.Item.Height - 6);
         }
 
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
-            if (e.ToolStrip is ToolStripDropDown) { base.OnRenderToolStripBackground(e); return; }
+            if (e.ToolStrip is ToolStripDropDown)
+            {
+                if (Palette == null) { base.OnRenderToolStripBackground(e); return; }
+                using (var menu = new SolidBrush(Palette.Menu)) e.Graphics.FillRectangle(menu, e.AffectedBounds);
+                return;
+            }
             using (var brush = new SolidBrush(e.ToolStrip.BackColor)) e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
+        {
+            if (Palette == null) { base.OnRenderImageMargin(e); return; }
+            using (var menu = new SolidBrush(Palette.Menu)) e.Graphics.FillRectangle(menu, e.AffectedBounds);
+        }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (Palette == null) { base.OnRenderMenuItemBackground(e); return; }
+            if (!e.Item.Enabled || (!e.Item.Selected && !e.Item.Pressed)) return;
+            bool menu = e.ToolStrip is ToolStripDropDown;
+            var bounds = menu ? new RectangleF(4F, 1F, e.Item.Width - 8F, e.Item.Height - 2F) : new RectangleF(1F, 2F, e.Item.Width - 2F, e.Item.Height - 4F);
+            FillRounded(e.Graphics, bounds, e.Item.Pressed && !menu ? Palette.PressedFill : Palette.HoverFill);
+        }
+
+        protected override void OnRenderDropDownButtonBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (Palette == null) { base.OnRenderDropDownButtonBackground(e); return; }
+            if (!e.Item.Selected && !e.Item.Pressed) return;
+            FillRounded(e.Graphics, new RectangleF(0.5F, 1.5F, e.Item.Width - 1.5F, e.Item.Height - 3.5F), e.Item.Pressed ? Palette.PressedFill : Palette.HoverFill);
+        }
+
+        private static void FillRounded(Graphics g, RectangleF bounds, Color color)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var path = ToolbarIcons.RoundRect(bounds.X, bounds.Y, bounds.Width, bounds.Height, 4F))
+            using (var brush = new SolidBrush(color)) g.FillPath(brush, path);
+        }
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            if (Palette != null) e.TextColor = e.Item.Enabled ? Palette.Text : Palette.MutedText;
+            base.OnRenderItemText(e);
+        }
+
+        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+        {
+            if (Palette != null) e.ArrowColor = e.Item != null && !e.Item.Enabled ? Palette.MutedText : Palette.Text;
+            base.OnRenderArrow(e);
+        }
+
+        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+        {
+            if (Palette == null) { base.OnRenderItemCheck(e); return; }
+            var r = e.ImageRectangle;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(Palette.Text, 1.6F))
+                e.Graphics.DrawLines(pen, new[] { new PointF(r.Left + r.Width * .22F, r.Top + r.Height * .52F),
+                    new PointF(r.Left + r.Width * .42F, r.Top + r.Height * .72F), new PointF(r.Left + r.Width * .78F, r.Top + r.Height * .3F) });
         }
 
         protected override void OnRenderButtonBackground(ToolStripItemRenderEventArgs e)
@@ -188,7 +263,14 @@ namespace SpeechCastMe
             var button = e.Item as ToolStripButton;
             if (button == null || e.ToolStrip is ToolStripDropDown) { base.OnRenderButtonBackground(e); return; }
             Color fill, border;
-            if (button.Pressed) { fill = PressedFill; border = HoverBorder; }
+            if (Palette != null)
+            {
+                if (button.Pressed) { fill = Palette.PressedFill; border = Palette.Border; }
+                else if (button.Checked) { fill = button.Selected ? Palette.CheckedHoverFill : Palette.CheckedFill; border = Palette.CheckedBorder; }
+                else if (button.Selected && button.Enabled) { fill = Palette.HoverFill; border = Palette.Border; }
+                else return;
+            }
+            else if (button.Pressed) { fill = PressedFill; border = HoverBorder; }
             else if (button.Checked) { fill = button.Selected ? Color.FromArgb(255, 228, 130) : CheckedFill; border = CheckedBorder; }
             else if (button.Selected && button.Enabled) { fill = HoverFill; border = HoverBorder; }
             else return;
