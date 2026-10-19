@@ -222,6 +222,7 @@
     <Compile Include="FormMain.Voices.cs" />
     <Compile Include="OneCoreVoices.cs" />
     <Compile Include="SpeechEngine.cs" />
+    <Compile Include="ToolbarIcons.cs" />
     <Compile Include="NotificationSoundPlayer.cs" />
     <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />

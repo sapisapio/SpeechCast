@@ -24,43 +24,49 @@ namespace SpeechCastMe
             // 2026-10-18: keep the original three rows and their existing handlers.
             readerToolbar = myToolStripPlay;
             readerToolbar.Items.Clear();
-            SetEmojiButton(toolStripButtonThreads, "📋", "スレッド一覧");
-            SetEmojiButton(toolStripButtonResponse, "✏️", "レスを書く");
-            SetEmojiButton(toolStripButtonFirst, "⏮️", "最初のレス");
-            SetEmojiButton(toolStripButtonPrev, "⏪️", "前のレス");
-            SetEmojiButton(toolStripButtonStop, "⏹️", "停止");
+            SetIconButton(toolStripButtonThreads, "threads", "スレッド一覧");
+            SetIconButton(toolStripButtonResponse, "write", "レスを書く");
+            SetIconButton(toolStripButtonFirst, "first", "最初のレス");
+            SetIconButton(toolStripButtonPrev, "prev", "前のレス");
+            SetIconButton(toolStripButtonStop, "stop", "停止");
             var play = new ToolStripButton { Name = "playCurrentResponse" };
-            SetEmojiButton(play, "▶️", "現在のレスを再生");
+            SetIconButton(play, "play", "現在のレスを再生");
             play.Click += delegate {
                 if (IsDesignPreview || responses.Count == 0) return;
                 var selected = GetSelectedResonse();
                 StartSpeaking(selected != null ? selected.Number : Math.Max(1, Math.Min(CurrentResNumber, responses.Count)));
                 fastReadingPaused = false;
             };
-            SetEmojiButton(toolStripButtonNext, "⏩️", "次のレス");
-            SetEmojiButton(toolStripButtonLast, "⏭️", "最後のレス");
+            SetIconButton(toolStripButtonNext, "next", "次のレス");
+            SetIconButton(toolStripButtonLast, "last", "最後のレス");
             toolStripButtonTurbo.Text = "ターボ";
             toolStripButtonTurbo.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonTurbo.ToolTipText = "ターボモード ON / OFF";
-            SetEmojiButton(toolStripButtonAutoUpdate, "🔽", "自動更新 ON / OFF（ONで末尾へ移動）");
-            SetEmojiButton(toolStripButtonZoomOutnResView, "🔍−", "コメント文字を小さく");
-            SetEmojiButton(toolStripButtonZoomInResView, "🔍＋", "コメント文字を大きく");
-            SetEmojiButton(toolStripButtonMoveBottom, "⤓", "最新レスへ移動");
+            // Auto update is the switch that matters most: first in the playback
+            // group, labelled, and highlighted while ON.
+            SetIconButton(toolStripButtonAutoUpdate, "update", "自動更新 ON / OFF（ONで末尾へ移動）");
+            toolStripButtonAutoUpdate.Text = "自動更新";
+            toolStripButtonAutoUpdate.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            toolStripButtonAutoUpdate.TextImageRelation = TextImageRelation.ImageBeforeText;
+            toolStripButtonAutoUpdate.Padding = new Padding(4, 0, 6, 0);
+            SetIconButton(toolStripButtonZoomOutnResView, "zoomout", "コメント文字を小さく");
+            SetIconButton(toolStripButtonZoomInResView, "zoomin", "コメント文字を大きく");
+            SetIconButton(toolStripButtonMoveBottom, "bottom", "最新レスへ移動");
             readerToolbar.Items.AddRange(new ToolStripItem[] { toolStripButtonThreads, toolStripButtonResponse,
-                new ToolStripSeparator(), toolStripButtonFirst, toolStripButtonPrev, toolStripButtonStop, play,
+                new ToolStripSeparator(), toolStripButtonAutoUpdate, toolStripButtonFirst, toolStripButtonPrev, toolStripButtonStop, play,
                 toolStripButtonNext, toolStripButtonLast, toolStripButtonTurbo });
-            foreach (ToolStripButton button in new[] { toolStripButtonMoveBottom, toolStripButtonZoomInResView, toolStripButtonZoomOutnResView, toolStripButtonAutoUpdate })
+            foreach (ToolStripButton button in new[] { toolStripButtonMoveBottom, toolStripButtonZoomInResView, toolStripButtonZoomOutnResView })
             {
                 button.Alignment = ToolStripItemAlignment.Right;
                 readerToolbar.Items.Add(button);
             }
 
-            SetEmojiButton(toolStripButtonCaption, "字", "テロップ表示 ON / OFF");
-            SetEmojiButton(toolStripButtonShowCaptionImmediately, "瞬", "テロップを瞬間表示");
+            SetIconButton(toolStripButtonCaption, "caption", "テロップ表示 ON / OFF");
+            SetIconButton(toolStripButtonShowCaptionImmediately, "instant", "テロップを瞬間表示 ON / OFF");
             InitializeAudioUi();
-            SetEmojiButton(toolStripButtonBorder, "▣", "テロップの位置調整枠");
-            SetEmojiButton(toolStripButtonSettings, "⚙️", "設定");
-            SetEmojiButton(toolStripButtonOpenResCaptionForm, "代", "代替字幕を開く");
+            SetIconButton(toolStripButtonBorder, "frame", "テロップの位置調整枠 ON / OFF");
+            SetIconButton(toolStripButtonSettings, "settings", "設定");
+            SetIconButton(toolStripButtonOpenResCaptionForm, "altcaption", "代替字幕を開く");
             toolStripLabel3.Text = "音量";
             toolStripLabel8.Text = "着信音量";
             toolStripComboBoxSelectVoice.Width = 132;
@@ -106,6 +112,7 @@ namespace SpeechCastMe
                 strip.BackColor = BackColor;
                 strip.GripStyle = ToolStripGripStyle.Hidden;
                 strip.Padding = new Padding(4, 2, 4, 2);
+                strip.Renderer = toolbarRenderer;
             }
             // Remove only the URL row's old left-side controls. Enter still opens a URL.
             myToolStripUrl.Items.Clear();
@@ -147,15 +154,26 @@ namespace SpeechCastMe
             SetReaderChrome();
         }
 
-        private static void SetEmojiButton(ToolStripButton button, string glyph, string description)
+        private readonly ReaderToolbarRenderer toolbarRenderer = new ReaderToolbarRenderer();
+
+        private static int ToolbarIconSize
         {
-            button.Text = glyph;
+            get { using (var screen = Graphics.FromHwnd(IntPtr.Zero)) return (int)Math.Round(18 * screen.DpiX / 96F); }
+        }
+
+        private static void SetIconButton(ToolStripButton button, string icon, string description)
+        {
+            if (button.Image != null && button.Tag as string == "reader-icon") button.Image.Dispose();
+            button.Image = ToolbarIcons.Create(icon, ToolbarIconSize);
+            button.Tag = "reader-icon";
+            button.ImageScaling = ToolStripItemImageScaling.None;
+            button.Text = description;
             button.ToolTipText = description;
             button.AccessibleName = description;
-            button.DisplayStyle = ToolStripItemDisplayStyle.Text;
-            button.Font = new Font("Segoe UI Emoji", 11F);
+            button.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            button.Font = new Font("Yu Gothic UI", 9F);
             button.AutoSize = true;
-            button.Padding = new Padding(2, 0, 2, 0);
+            button.Padding = new Padding(3, 1, 3, 1);
             button.Margin = new Padding(0, 0, 1, 0);
         }
 

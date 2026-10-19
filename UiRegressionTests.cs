@@ -254,13 +254,31 @@ class UiRegressionTests
             var play = (ToolStrip)Field(form,"myToolStripPlay");
             var voice = (ToolStrip)Field(form,"myToolStripVoice");
             var url = (ToolStrip)Field(form,"myToolStripUrl");
-            Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Alignment == ToolStripItemAlignment.Right && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Right >= play.ClientSize.Width - 16, "viewer controls are anchored to the actual right edge");
+            Check(((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Alignment == ToolStripItemAlignment.Right && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Right >= play.ClientSize.Width - 16, "viewer controls are anchored to the actual right edge");
             Check(play.Visible && voice.Visible && url.Visible, "voice play and URL rows are visible by default");
             Check(((ToolStripItem)Field(form,"toolStripComboBoxSelectVoice")).Owner == voice && ((ToolStripItem)Field(form,"toolStripTrackBarVoiceVolume")).Owner == voice, "voice selector and volume remain on voice row");
             Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Owner == play && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Owner == play, "update and viewer controls share play row");
-            Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Left, "right-aligned update zoom and bottom controls keep intended order");
+            var autoUpdate = (ToolStripButton)Field(form,"toolStripButtonAutoUpdate");
+            Check(autoUpdate.Alignment == ToolStripItemAlignment.Left && play.Items.IndexOf(autoUpdate) + 1 == play.Items.IndexOf((ToolStripItem)Field(form,"toolStripButtonFirst")), "auto update leads the playback controls");
+            Check(((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Left, "right-aligned zoom and bottom controls keep intended order");
+            foreach (var name in new[] { "toolStripButtonCaption", "toolStripButtonShowCaptionImmediately", "toolStripButtonBorder", "toolStripButtonOpenResCaptionForm", "toolStripButtonFirst", "toolStripButtonMoveBottom" })
+            {
+                var button = (ToolStripButton)typeof(FormMain).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).GetValue(form);
+                Check(button.Image != null && button.DisplayStyle == ToolStripItemDisplayStyle.Image && button.ToolTipText.Length > 1, "drawn icon with a tooltip: " + name);
+            }
+            Check(voice.Renderer is ReaderToolbarRenderer && play.Renderer is ReaderToolbarRenderer, "toolbars use the reader renderer");
+            using (var strip = new ToolStrip { Renderer = new ReaderToolbarRenderer(), BackColor = Color.White, Size = new Size(80, 30) })
+            using (var bitmap = new Bitmap(80, 30))
+            {
+                var on = new ToolStripButton("ON") { Checked = true, AutoSize = false, Size = new Size(40, 26) };
+                strip.Items.Add(on);
+                strip.PerformLayout();
+                strip.DrawToBitmap(bitmap, new Rectangle(0, 0, 80, 30));
+                Color fill = bitmap.GetPixel(on.Bounds.Left + 4, on.Bounds.Top + on.Bounds.Height / 2);
+                Check(fill.ToArgb() == ReaderToolbarRenderer.CheckedFill.ToArgb(), "checked buttons are filled pale yellow");
+            }
             Check(url.Items.Count == 5 && url.Items[0] == Field(form,"feedModeSelector") && url.Items[1] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row contains source mode URL keyword and toggle");
-            Check(((ToolStripButton)Field(form,"toolStripButtonAutoUpdate")).Text == "🔽" && ((ToolStripButton)Field(form,"toolStripButtonTurbo")).Text == "ターボ", "update emoji and explicit turbo label retained");
+            Check(autoUpdate.Text == "自動更新" && autoUpdate.DisplayStyle == ToolStripItemDisplayStyle.ImageAndText && ((ToolStripButton)Field(form,"toolStripButtonTurbo")).Text == "ターボ", "auto update is labelled and turbo keeps its label");
             var modes = (ToolStripComboBox)Field(form,"audioModeSelector");
             Check(modes.Owner == voice && modes.Items.Count == 3 && ((ToolStripItem)Field(form,"toolStripButtonClickSound")).Owner == null, "audio selector replaces independent toggles and removes reload sound");
             modes.SelectedIndex = (int)AudioNotificationMode.Sound;
