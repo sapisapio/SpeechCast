@@ -165,6 +165,14 @@ namespace SpeechCastMe
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e) { }
 
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            if (!e.Vertical || e.ToolStrip is ToolStripDropDown) { base.OnRenderSeparator(e); return; }
+            int x = e.Item.Width / 2;
+            using (var pen = new Pen(Color.FromArgb(160, 174, 192)))
+                e.Graphics.DrawLine(pen, x, 5, x, e.Item.Height - 6);
+        }
+
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
             if (e.ToolStrip is ToolStripDropDown) { base.OnRenderToolStripBackground(e); return; }

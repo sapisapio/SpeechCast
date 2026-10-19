@@ -51,12 +51,11 @@ namespace SpeechCastMe
             SetIconButton(toolStripButtonZoomOutnResView, "zoomout", "コメント文字を小さく");
             SetIconButton(toolStripButtonZoomInResView, "zoomin", "コメント文字を大きく");
             SetIconButton(toolStripButtonMoveBottom, "bottom", "最新レスへ移動");
-            readerToolbar.Items.AddRange(new ToolStripItem[] {
+            readerToolbar.Items.AddRange(new ToolStripItem[] { toolStripButtonThreads, toolStripButtonResponse, new ToolStripSeparator(),
                 toolStripButtonAutoUpdate, toolStripButtonAutoScroll, toolStripButtonMoveBottom,
                 new ToolStripSeparator(), toolStripButtonFirst, toolStripButtonPrev, toolStripButtonStop, play,
-                toolStripButtonNext, toolStripButtonLast, toolStripButtonTurbo,
-                new ToolStripSeparator(), toolStripButtonZoomOutnResView, toolStripButtonZoomInResView });
-            foreach (ToolStripButton button in new[] { toolStripButtonResponse, toolStripButtonThreads })
+                toolStripButtonNext, toolStripButtonLast, toolStripButtonTurbo });
+            foreach (ToolStripButton button in new[] { toolStripButtonZoomInResView, toolStripButtonZoomOutnResView })
             {
                 button.Alignment = ToolStripItemAlignment.Right;
                 readerToolbar.Items.Add(button);
