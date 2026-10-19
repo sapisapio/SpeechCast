@@ -29,13 +29,14 @@ namespace SpeechCastMe
             SetIconButton(toolStripButtonFirst, "first", "最初のレス");
             SetIconButton(toolStripButtonPrev, "prev", "前のレス");
             SetIconButton(toolStripButtonStop, "stop", "停止");
-            var play = new ToolStripButton { Name = "playCurrentResponse" };
-            SetIconButton(play, "play", "現在のレスを再生");
+            var play = playButton = new ToolStripButton { Name = "playCurrentResponse" };
+            SetIconButton(play, "play", "読み上げ再開（自動更新ONの間は順に読み進める）");
             play.Click += delegate {
                 if (IsDesignPreview || responses.Count == 0) return;
                 var selected = GetSelectedResonse();
                 StartSpeaking(selected != null ? selected.Number : Math.Max(1, Math.Min(CurrentResNumber, responses.Count)));
-                fastReadingPaused = false;
+                readingPaused = false;
+                UpdateReadingUi();
             };
             SetIconButton(toolStripButtonNext, "next", "次のレス");
             SetIconButton(toolStripButtonLast, "last", "最後のレス");
@@ -159,6 +160,15 @@ namespace SpeechCastMe
         private static int ToolbarIconSize
         {
             get { using (var screen = Graphics.FromHwnd(IntPtr.Zero)) return (int)Math.Round(18 * screen.DpiX / 96F); }
+        }
+
+        private ToolStripButton playButton;
+
+        // ▶ is lit while replies are read through continuously (auto update ON
+        // and reading not paused by ⏹ or a manual step).
+        private void UpdateReadingUi()
+        {
+            if (playButton != null) playButton.Checked = AutoUpdate && !readingPaused;
         }
 
         private static void SetLabelledIcon(ToolStripButton button, string label)

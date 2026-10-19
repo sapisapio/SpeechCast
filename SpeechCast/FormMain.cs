@@ -954,6 +954,7 @@ namespace SpeechCastMe
             {
                 bool changed = toolStripButtonAutoUpdate.Checked != value;
                 toolStripButtonAutoUpdate.Checked = value;
+                if (changed && value) readingPaused = false;
                 if (value)
                 {
                     ScrollToDocumentEnd();
@@ -967,6 +968,7 @@ namespace SpeechCastMe
                 }
                 else communicationStatusString = "";
                 if (changed) OnFastAcquisitionChanged(value);
+                UpdateReadingUi();
             }
         }
 
@@ -1415,7 +1417,10 @@ namespace SpeechCastMe
         public void StopSpeaking()
         {
             StopSpeakingCore();
-            if (IsFastBoardFeed) fastReadingPaused = true; else AutoUpdate = false;
+            // Stopping pauses reading only; fetching new replies (auto update)
+            // keeps running. ▶ resumes continuous reading.
+            readingPaused = true;
+            UpdateReadingUi();
         }
 
         private void StopSpeakingCore()
@@ -1623,7 +1628,7 @@ namespace SpeechCastMe
                 if (
                     diff.TotalMilliseconds >= speakingInvervalMillsec
                     && AutoUpdate
-                    && (!IsFastBoardFeed || !fastReadingPaused)
+                    && !readingPaused
                     //&& responses.Count >= CurrentResNumber
                     )
                 {

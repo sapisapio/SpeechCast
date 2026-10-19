@@ -421,13 +421,16 @@ class UiRegressionTests
         form.StopSpeaking();
         int before = replies.Count;
         apply.Invoke(form,new object[] {FastMessage("400",1)});
-        Check(form.AutoUpdate && replies.Count == before + 1 && (bool)Field(form,"fastReadingPaused"), "pausing reading keeps board-wide acquisition running");
+        Check(form.AutoUpdate && replies.Count == before + 1 && (bool)Field(form,"readingPaused"), "pausing reading keeps board-wide acquisition running");
+        var playButton = (ToolStripButton)Field(form,"playButton");
+        Check(!playButton.Checked, "paused reading leaves the play button unlit");
         Check((int)typeof(FormMain).GetProperty("CurrentResponseLimit",flags).GetValue(form,null) == int.MaxValue, "board feed does not stop at a single-thread 1000-response boundary");
         form.AutoUpdate = false;
         before = replies.Count;
         apply.Invoke(form,new object[] {FastMessage("400",2)});
         Check(replies.Count == before, "turning acquisition off stops new board arrivals");
         form.AutoUpdate = true;
+        Check(!(bool)Field(form,"readingPaused") && playButton.Checked, "turning auto update on resumes continuous reading and lights play");
         before = replies.Count;
         JpnknFastMessage shortBody;
         Check(JpnknFastMessage.TryParse("bbs/sapio","{\"bbsid\":\"sapio\",\"threadkey\":\"500\",\"no\":1,\"body\":\"名無し<>sage<>2026/10/19 ID:a<>末尾区切りなし\"}",out shortBody), "Fast body without a trailing field parses");
@@ -445,6 +448,10 @@ class UiRegressionTests
         apply.Invoke(form,new object[] {FastMessage("100",2)});
         apply.Invoke(form,new object[] {FastMessage("100",1)});
         Check(replies.Count == 2, "thread mode appends sequential replies once without duplicate replay");
+        form.StopSpeaking();
+        apply.Invoke(form,new object[] {FastMessage("100",3)});
+        Check(form.AutoUpdate && (bool)Field(form,"readingPaused") && replies.Count == 3, "stopping or stepping in thread mode pauses reading but keeps auto update on");
+        form.AutoUpdate = false; form.AutoUpdate = true;
         FastSnapshotChecks(form,browser,replies,apply);
     }
 

@@ -12,7 +12,7 @@ namespace SpeechCastMe
         private JpnknFastTarget fastTarget;
         private JpnknFastClient fastClient;
         private int fastGeneration;
-        private bool fastConnected, fastReadingPaused, syncingFeedMode, loadingThread;
+        private bool fastConnected, readingPaused, syncingFeedMode, loadingThread;
         private bool fastNeedsRecovery;
         private int fastExpectedNumber;
         private DateTime lastFastRecovery = DateTime.MinValue;
@@ -69,7 +69,7 @@ namespace SpeechCastMe
             StopFastClient();
             fastTarget = null;
             fastPending.Clear(); fastSeen.Clear(); fastSeenOrder.Clear();
-            fastReadingPaused = false;
+            readingPaused = false;
             fastExpectedNumber = 0;
             fastNeedsRecovery = false;
             if (fastStatusLabel != null) fastStatusLabel.Available = false;
@@ -78,7 +78,7 @@ namespace SpeechCastMe
         private void OnFastAcquisitionChanged(bool enabled)
         {
             if (fastTarget == null) return;
-            fastReadingPaused = false;
+            readingPaused = false;
             if (enabled) EnsureFastSubscription(); else StopFastClient();
         }
 
