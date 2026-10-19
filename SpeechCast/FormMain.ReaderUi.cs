@@ -35,6 +35,7 @@ namespace SpeechCastMe
                 if (IsDesignPreview || responses.Count == 0) return;
                 var selected = GetSelectedResonse();
                 StartSpeaking(selected != null ? selected.Number : Math.Max(1, Math.Min(CurrentResNumber, responses.Count)));
+                fastReadingPaused = false;
             };
             SetEmojiButton(toolStripButtonNext, "⏩️", "次のレス");
             SetEmojiButton(toolStripButtonLast, "⏭️", "最後のレス");
@@ -109,6 +110,7 @@ namespace SpeechCastMe
             // Remove only the URL row's old left-side controls. Enter still opens a URL.
             myToolStripUrl.Items.Clear();
             myToolStripUrl.Items.AddRange(new ToolStripItem[] { toolStripTextBoxURL, toolStripLabel7, toolStripTextBoxThreadKeyword, toolStripButtonAutoNextThread });
+            InitializeFastUi();
             toolStripLabel7.Text = "次スレキーワード";
             toolStripButtonAutoNextThread.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonAutoNextThread.ToolTipText = "次スレへ自動移動 ON / OFF";
@@ -117,7 +119,14 @@ namespace SpeechCastMe
             toolStripTextBoxThreadKeyword.AutoSize = false;
             toolStripTextBoxThreadKeyword.Width = 100;
             myToolStripUrl.Layout += delegate {
-                int available = myToolStripUrl.ClientSize.Width - myToolStripUrl.Padding.Horizontal - 28;
+                int available = myToolStripUrl.ClientSize.Width - myToolStripUrl.Padding.Horizontal - 28 - feedModeSelector.Width - feedModeSelector.Margin.Horizontal;
+                if (UserConfig != null && UserConfig.JpnknBoardMode)
+                {
+                    toolStripLabel7.Available = false;
+                    toolStripTextBoxURL.AutoSize = false;
+                    toolStripTextBoxURL.Width = Math.Max(60, available);
+                    return;
+                }
                 int keywordWidth = Math.Max(60, Math.Min(140, available / 4));
                 int keywordLabel = available >= 450 ? toolStripLabel7.Width + toolStripLabel7.Margin.Horizontal : 0;
                 toolStripLabel7.Available = available >= 450;
@@ -178,6 +187,7 @@ namespace SpeechCastMe
         private void FinishReaderUi()
         {
             SyncAudioModeUi();
+            UpdateFeedModeUi();
             splitContainer1.Panel1Collapsed = true;
             splitContainerResCaption.Panel2Collapsed = true;
             // Font size now uses native pixels; old fractional CSS zoom blurred small glyphs.

@@ -12,6 +12,7 @@ namespace SpeechCastMe
     public class UserConfig
     {
         // UI refresh preferences, 2026-10-18.
+        public bool JpnknBoardMode = false;
         public string CommentLayout = "compact";
         public string CommentTheme = "light";
         public string CommentBackground = "";

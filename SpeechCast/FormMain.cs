@@ -166,7 +166,7 @@ namespace SpeechCastMe
                     CurrentResNumber = CurrentResNumber;
                 }
                 //ミミック勝手に改造　レス数警告の判定処理を読み上げ完了時の処理に行う
-                else if (CurrentResNumber == UserConfig.endThreadWarningResCount)
+                else if (!IsFastBoardFeed && CurrentResNumber == UserConfig.endThreadWarningResCount)
                 {
                     isSpeaking = true;
                         if (isSpeaking)
@@ -177,7 +177,7 @@ namespace SpeechCastMe
                         }
                 }
                 else if (
-                        CurrentResNumber <= Response.MaxResponseCount
+                        CurrentResNumber <= CurrentResponseLimit
                     && (speakClipboard == false && endThreadWarning == false))
                      {                       
                         CurrentResNumber++;
@@ -269,38 +269,64 @@ namespace SpeechCastMe
 
         private async void GetFromURL()
         {
-            if (CheckBaseURL())
+            if (loadingThread || !endWebRequest) return;
+            if (UserConfig.JpnknBoardMode)
             {
-                if (ShowFormBBSThreads() == false)
+                JpnknFastTarget target;
+                if (!JpnknFastTarget.TryParse(toolStripTextBoxURL.Text, true, out target))
                 {
+                    MessageBox.Show(this, "jpnknの掲示板URLまたは板IDを入力してください。", "板全体 Fast");
                     return;
                 }
-                else
-                {
-                    CurrentResNumber = 0;
-                }
+                StopSpeakingCore(); AutoUpdate = false;
+                BeginBoardFeed(target);
+                return;
             }
+            if (CheckBaseURL() && !ShowFormBBSThreads()) return;
+            loadingThread = true;
+            feedModeSelector.Enabled = toolStripTextBoxURL.Enabled = false;
+            bool wasBoardFeed = IsFastBoardFeed;
+            StopSpeakingCore(); AutoUpdate = false; ClearFastSession();
+            if (wasBoardFeed) oldUrl = null; // A board feed is not a thread history.
             try
             {
-                CompleteThreadLoad(await GetFromURL(false));
+                bool success = await GetFromURL(false);
+                if (success) ConfigureThreadFast();
+                CompleteThreadLoad(success);
             }
-            catch (Exception ex)
+            catch (Exception ex) { AddLog("Exception: {0}", ex.Message); }
+            finally
             {
-                AddLog("Exception: {0}", ex.Message);
+                loadingThread = false;
+                if (!IsDisposed) feedModeSelector.Enabled = toolStripTextBoxURL.Enabled = !IsDesignPreview;
             }
         }
 
         private async Task GetFromURLNext()
         {
             this.endWebRequest = false;
-            if (!await GetFromURL(true))
+            feedModeSelector.Enabled = false;
+            try
             {
-                if (needsRetry)
+                if (fastTarget != null && !IsFastBoardFeed)
                 {
-                   await GetFromURL(false);
+                    // Fast appends do not advance the old DAT byte-range offset.
+                    // Reconcile from an authoritative snapshot instead of appending
+                    // a range that may contain responses already received by MQTT.
+                    int oldCount = responses.Count;
+                    if (await GetFromURL(false)) NotifyNewResponses(true, oldCount, responses.Count);
+                    else fastNeedsRecovery = true;
+                    if (responses.Count < fastExpectedNumber) fastNeedsRecovery = true;
                 }
+                else if (!await GetFromURL(true) && needsRetry) await GetFromURL(false);
             }
-            this.endWebRequest = true;
+            catch (Exception ex) { AddLog("Update: {0}", ex.Message); fastNeedsRecovery = true; }
+            finally
+            {
+                this.endWebRequest = true;
+                DrainFastMessages();
+                if (!IsDisposed) feedModeSelector.Enabled = !IsDesignPreview && !loadingThread;
+            }
         }
        
         string encodingName = "";
@@ -409,6 +435,7 @@ namespace SpeechCastMe
             bool result = true;
             bool updated = false;
             bool useRangeHeader = false;
+            int rebuildScrollTop = -1;
             needsRetry = false;
             if (next && rawURL != null)
             {
@@ -588,6 +615,7 @@ namespace SpeechCastMe
                 }
                 webReqResult = false;
             }
+                if (!webReqResult) return false;
                 if (webReqResult)
                 {
                     try
@@ -779,6 +807,12 @@ namespace SpeechCastMe
                                 int startIndex;
                                 if (clearItems)
                                 {
+                                    oldResCount = 0;
+                                    if (webBrowser.Document != null)
+                                    {
+                                        rebuildScrollTop = Convert.ToInt32(webBrowser.Document.InvokeScript("scrollTop"));
+                                        webBrowser.Document.InvokeScript("clearRes");
+                                    }
                                     responses.Clear();
                                     listViewResponses.Items.Clear();
                                     startIndex = 0;
@@ -839,6 +873,7 @@ namespace SpeechCastMe
                             objArray[0] = responses[idx].Html;
                             webBrowser.Document.InvokeScript("addRes", objArray);
                         }
+                        if (rebuildScrollTop >= 0) webBrowser.Document.InvokeScript("scrollToY", new object[] { rebuildScrollTop });
                         if (moveScrollBottom)
                         {
                             webBrowser.Document.InvokeScript("scrollBottom");
@@ -929,6 +964,7 @@ namespace SpeechCastMe
                     }
                 }
                 else communicationStatusString = "";
+                if (changed) OnFastAcquisitionChanged(value);
             }
         }
 
@@ -981,7 +1017,7 @@ namespace SpeechCastMe
                 CurrentResNumber = 1;
             }
 
-            if (CurrentResNumber <= responses.Count && CurrentResNumber <= Response.MaxResponseCount)
+            if (CurrentResNumber <= responses.Count && CurrentResNumber <= CurrentResponseLimit)
             {
                 Response res = responses[CurrentResNumber - 1];
                 string text = res.Text;
@@ -993,7 +1029,7 @@ namespace SpeechCastMe
 
                 if (UserConfig.SpeaksResNumber)
                 {
-                    text = string.Format("レス{0}\n{1}", res.Number, text);
+                    text = string.Format("レス{0}\n{1}", res.DisplayNumber, text);
                 }
 
                 isSpeakingWarningMessage = false;
@@ -1008,7 +1044,7 @@ namespace SpeechCastMe
                     {
                         String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
                         LogText2 = LogText2.Replace("#Name#", res.Name);
-                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#No#", res.DisplayNumber.ToString());
                         LogText2 = LogText2.Replace("#Time#", res.DateTime);
                         LogText2 = LogText2.Replace(" ", "。");
                         if (LogText2.Contains("/Talk"))
@@ -1026,7 +1062,7 @@ namespace SpeechCastMe
                     {
                         String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
                         LogText2 = LogText2.Replace("#Name#", res.Name);
-                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#No#", res.DisplayNumber.ToString());
                         LogText2 = LogText2.Replace("#Time#", res.DateTime);
                         LogText2 = LogText2.Replace(" ", "。");
                         if (LogText2.Contains("/Talk"))
@@ -1044,7 +1080,7 @@ namespace SpeechCastMe
                     {
                         String LogText = UserConfig.CommandLineParam.Replace("#Res#" ,res.Text);
                         LogText = LogText.Replace("#Name#" ,res.Name);
-                        LogText = LogText.Replace("#No#" ,res.Number.ToString());
+                        LogText = LogText.Replace("#No#" ,res.DisplayNumber.ToString());
                         LogText = LogText.Replace("#Time#" ,res.DateTime);
                         LogText = LogText.Replace("\n", "");
                         LogText = LogText.Replace(" ", "。");
@@ -1064,7 +1100,7 @@ namespace SpeechCastMe
                     {
                         String LogText = UserConfig.OutputLogFormat.Replace("#Res#", res.Text);
                         LogText = LogText.Replace("#Name#", res.Name);
-                        LogText = LogText.Replace("#No#", res.Number.ToString());
+                        LogText = LogText.Replace("#No#", res.DisplayNumber.ToString());
                         LogText = LogText.Replace("#Time#", res.DateTime);
                         Clipboard.SetDataObject(LogText, true);
                     }
@@ -1126,7 +1162,7 @@ namespace SpeechCastMe
                             {
                                 var LogText = UserConfig.OutputLogFormat.Replace("#Res#", resText);
                                 LogText = LogText.Replace("#Name#", res.Name);
-                                LogText = LogText.Replace("#No#", res.Number.ToString());
+                                LogText = LogText.Replace("#No#", res.DisplayNumber.ToString());
                                 LogText = LogText.Replace("#Time#", res.DateTime);
                                 writer.WriteLine(LogText);
                                 
@@ -1204,14 +1240,14 @@ namespace SpeechCastMe
 
 
             }
-            else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread)
+            else if (CurrentResNumber > CurrentResponseLimit && openNextThread == ReadThread)
             {
 
-                speakingText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                speakingText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", CurrentResponseLimit);
                 //ミミック勝手に改造 1000スレ到達&次スレ移行もコマンドラインとテキスト出力へ送信
                 //if (UserConfig.CommandLineTargetPath != "")
                 //{
-                   // String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                   // String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", CurrentResponseLimit);
                     //System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, fuckyou);
                 //}
                 //レスの出力処理とクリップボードコピー
@@ -1220,7 +1256,7 @@ namespace SpeechCastMe
                     //クリップボード周り
                     if (UserConfig.CopyLog)
                     {
-                        String LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                        String LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", CurrentResponseLimit);
                         Clipboard.SetDataObject(LogText, true);
                     }
                     //レス出力周り
@@ -1245,7 +1281,7 @@ namespace SpeechCastMe
                         //using (var writer = new StreamWriter(UserConfig.OutputLogPath.Replace(".", fileNameIndex.ToString() + "."), UserConfig.LogAppendMode, OutputEncoding))
                         using (var writer = new StreamWriter(UserConfig.OutputLogPath, UserConfig.LogAppendMode, OutputEncoding))
                         {
-                            var LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                            var LogText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", CurrentResponseLimit);
                             writer.WriteLine(LogText);
 
 
@@ -1263,7 +1299,7 @@ namespace SpeechCastMe
                 isSpeaking = true;
                 if (UserConfig.CommandLineTargetPath != "")
                 {
-                    String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
+                    String fuckyou = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", CurrentResponseLimit);
                     System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, fuckyou);
                 }
                 synthesizer.SpeakAsync(speakingText);
@@ -1377,7 +1413,7 @@ namespace SpeechCastMe
         public void StopSpeaking()
         {
             StopSpeakingCore();
-            AutoUpdate = false;
+            if (IsFastBoardFeed) fastReadingPaused = true; else AutoUpdate = false;
         }
 
         private void StopSpeakingCore()
@@ -1585,6 +1621,7 @@ namespace SpeechCastMe
                 if (
                     diff.TotalMilliseconds >= speakingInvervalMillsec
                     && AutoUpdate
+                    && (!IsFastBoardFeed || !fastReadingPaused)
                     //&& responses.Count >= CurrentResNumber
                     )
                 {
@@ -1687,6 +1724,9 @@ namespace SpeechCastMe
         // レス取得用バックグラウンドプロセス
         private async void timerWeb_Tick(object sender, EventArgs e)
         {
+            if (loadingThread) return;
+            bool fastHandled = await HandleFastRecovery();
+            if (IsFastBoardFeed) return;
             // 自動Webアクセス条件がTrueなら
             if(
                     diffWeb.TotalMilliseconds >= UserConfig.AutoGettingWebInvervalMillsec
@@ -1695,7 +1735,7 @@ namespace SpeechCastMe
               ){
                 // 自動次スレ取得の条件判別
                 if (
-                        CurrentResNumber > Response.MaxResponseCount
+                        CurrentResNumber > CurrentResponseLimit
                         && UserConfig.AutoOpenNextThread
                         && openNextThread == ReadThread
                     )
@@ -1705,7 +1745,7 @@ namespace SpeechCastMe
 
                 // レス取得の条件判定
                 if (
-                        responses.Count < Response.MaxResponseCount
+                        !fastHandled && responses.Count < CurrentResponseLimit
                         && this.endWebRequest
                     )
                 {
@@ -1857,6 +1897,7 @@ namespace SpeechCastMe
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            ClearFastSession();
             notificationPlayer.Dispose();
             if (IsDesignPreview)
             {

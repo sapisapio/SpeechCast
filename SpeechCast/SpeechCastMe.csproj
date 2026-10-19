@@ -114,6 +114,10 @@
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="PresentationCore" />
+    <Reference Include="MQTTnet">
+      <HintPath>..\.packages\mqttnet\3.1.2\lib\net452\MQTTnet.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Speech">
@@ -123,6 +127,7 @@
     <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
@@ -196,6 +201,9 @@
     <Compile Include="FormEditFontColors.Designer.cs">
       <DependentUpon>FormEditFontColors.cs</DependentUpon>
     </Compile>
+    <Compile Include="JpnknFastMessage.cs" />
+    <Compile Include="JpnknFastClient.cs" />
+    <Compile Include="FormMain.Fast.cs" />
     <Compile Include="NotificationSoundPlayer.cs" />
     <Compile Include="FormMain.Audio.cs" />
     <Compile Include="FormMain.ReaderUi.cs" />
@@ -335,6 +343,9 @@
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MQTTnet" Version="3.1.2" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

@@ -110,6 +110,7 @@ class UiRegressionTests
             caption.Close();
         }
         BrowserChecks(sample);
+        FastParsingChecks();
         ToolbarChecks();
         SoundChecks();
     }
@@ -142,7 +143,7 @@ class UiRegressionTests
             Check(((ToolStripItem)Field(form,"toolStripComboBoxSelectVoice")).Owner == voice && ((ToolStripItem)Field(form,"toolStripTrackBarVoiceVolume")).Owner == voice, "voice selector and volume remain on voice row");
             Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Owner == play && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Owner == play, "update and viewer controls share play row");
             Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Left, "right-aligned update zoom and bottom controls keep intended order");
-            Check(url.Items.Count == 4 && url.Items[0] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row starts with field and contains keyword and toggle");
+            Check(url.Items.Count == 5 && url.Items[0] == Field(form,"feedModeSelector") && url.Items[1] == Field(form,"toolStripTextBoxURL") && ((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Owner == url && ((ToolStripItem)Field(form,"toolStripButtonAutoNextThread")).Owner == url, "URL row contains source mode URL keyword and toggle");
             Check(((ToolStripButton)Field(form,"toolStripButtonAutoUpdate")).Text == "🔽" && ((ToolStripButton)Field(form,"toolStripButtonTurbo")).Text == "ターボ", "update emoji and explicit turbo label retained");
             var modes = (ToolStripComboBox)Field(form,"audioModeSelector");
             Check(modes.Owner == voice && modes.Items.Count == 3 && ((ToolStripItem)Field(form,"toolStripButtonClickSound")).Owner == null, "audio selector replaces independent toggles and removes reload sound");
@@ -180,9 +181,134 @@ class UiRegressionTests
             form.Width = 240;
             Application.DoEvents();
             Check(form.Width == 240, "reorganized toolbar still permits narrow window");
+            BoardFeedChecks(form,browser);
             form.Close();
         }
         Environment.SetEnvironmentVariable("SPEECHCAST_UI_PREVIEW", null);
+    }
+
+    static JpnknFastMessage FastMessage(string thread, int number, string board = "sapio")
+    {
+        JpnknFastMessage message;
+        string json = "{\"bbsid\":\"" + board + "\",\"threadkey\":\"" + thread + "\",\"no\":\"" + number + "\",\"body\":\"名無し<>sage<>2026/10/19(月) 12:34:56 ID:abc<>本文 &gt;&gt;49 <img src=x><>\"}";
+        if (!JpnknFastMessage.TryParse("bbs/" + board,json,out message)) throw new Exception("Fast fixture failed");
+        return message;
+    }
+
+    static void FastParsingChecks()
+    {
+        JpnknFastTarget target;
+        Check(JpnknFastTarget.TryParse("sapio",true,out target) && target.Topic == "bbs/sapio" && target.Thread == null, "board ID alone selects a complete board subscription");
+        Check(JpnknFastTarget.TryParse("https://bbs.jpnkn.com/sapio/",true,out target) && target.Board == "sapio", "board URL accepted without thread selection");
+        Check(JpnknFastTarget.TryParse("https://bbs.jpnkn.com/test/read.cgi/sapio/1234567890/",true,out target) && target.Thread == null, "board mode ignores a pasted thread path and subscribes to its board");
+        Check(JpnknFastTarget.TryParse("https://bbs.jpnkn.com/test/read.cgi/sapio/1234567890/",false,out target) && target.Thread == "1234567890", "normal mode retains the chosen thread filter");
+        Check(!JpnknFastTarget.TryParse("https://bbs.jpnkn.com.evil.test/sapio/",true,out target) && !JpnknFastTarget.TryParse("bbs/+",true,out target) && !JpnknFastTarget.TryParse("#",true,out target), "unrelated hosts and broad MQTT wildcards rejected");
+        JpnknFastMessage message;
+        Check(!JpnknFastMessage.TryParse("bbs/other", "{\"bbsid\":\"sapio\",\"threadkey\":\"100\",\"no\":1,\"body\":\"a<>b<>c<>d<>\"}",out message), "payload board must match the subscribed topic");
+        Check(!JpnknFastMessage.TryParse("bbs/sapio","{broken",out message) && !JpnknFastMessage.TryParse("bbs/sapio","{}",out message), "malformed and incomplete Fast payloads ignored");
+        var config = new UserConfig { JpnknBoardMode = true };
+        var serializer = new XmlSerializer(typeof(UserConfig));
+        using (var writer = new StringWriter())
+        {
+            serializer.Serialize(writer,config);
+            Check(((UserConfig)serializer.Deserialize(new StringReader(writer.ToString()))).JpnknBoardMode, "board-wide source mode persists in settings");
+        }
+    }
+
+    static void BoardFeedChecks(FormMain form, WebBrowser browser)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var modes = (ToolStripComboBox)Field(form,"feedModeSelector");
+        modes.SelectedIndex = 1;
+        Check(FormMain.UserConfig.JpnknBoardMode && !((ToolStripItem)Field(form,"toolStripTextBoxThreadKeyword")).Available, "board mode hides next-thread controls and needs only a board input");
+        JpnknFastTarget target; JpnknFastTarget.TryParse("sapio",true,out target);
+        typeof(FormMain).GetMethod("BeginBoardFeed",flags).Invoke(form,new object[] {target});
+        var replies = (System.Collections.IList)Field(form,"responses");
+        var apply = typeof(FormMain).GetMethod("ApplyFastMessage",flags);
+        Check(replies.Count == 0 && form.CurrentResNumber == 1 && form.AutoUpdate, "board feed starts empty with acquisition enabled");
+        apply.Invoke(form,new object[] {FastMessage("100",50)});
+        apply.Invoke(form,new object[] {FastMessage("200",50)});
+        apply.Invoke(form,new object[] {FastMessage("100",50)});
+        Check(replies.Count == 2 && form.CurrentResNumber == 1, "different threads append independently of playback cursor and duplicates are excluded");
+        var type = replies[0].GetType();
+        string html = (string)type.GetField("Html").GetValue(replies[0]);
+        Check((int)type.GetField("Number").GetValue(replies[0]) == 1 && (int)type.GetProperty("DisplayNumber").GetValue(replies[0],null) == 50 && html.Contains("50:</span>"), "original response numbers are separate from playback queue positions");
+        Check(html.Contains("スレ 100") && html.Contains("https://bbs.jpnkn.com/test/read.cgi/sapio/100/49") && !html.Contains("<img"), "board rows identify source threads preserve reply links and escape markup");
+        for (int i = 1; i <= 40; i++) apply.Invoke(form,new object[] {FastMessage("300",i)});
+        Script(browser,"scrollToY",300);
+        int position = Convert.ToInt32(Script(browser,"scrollTop"));
+        apply.Invoke(form,new object[] {FastMessage("300",41)});
+        Check(Convert.ToInt32(Script(browser,"scrollTop")) == position && form.CurrentResNumber == 1, "board arrivals do not force manual scroll or playback position");
+        form.StopSpeaking();
+        int before = replies.Count;
+        apply.Invoke(form,new object[] {FastMessage("400",1)});
+        Check(form.AutoUpdate && replies.Count == before + 1 && (bool)Field(form,"fastReadingPaused"), "pausing reading keeps board-wide acquisition running");
+        Check((int)typeof(FormMain).GetProperty("CurrentResponseLimit",flags).GetValue(form,null) == int.MaxValue, "board feed does not stop at a single-thread 1000-response boundary");
+        form.AutoUpdate = false;
+        before = replies.Count;
+        apply.Invoke(form,new object[] {FastMessage("400",2)});
+        Check(replies.Count == before, "turning acquisition off stops new board arrivals");
+        form.AutoUpdate = true;
+        typeof(FormMain).GetMethod("ClearFastSession",flags).Invoke(form,null);
+        JpnknFastTarget.TryParse("https://bbs.jpnkn.com/test/read.cgi/sapio/100/",false,out target);
+        typeof(FormMain).GetField("fastTarget",flags).SetValue(form,target);
+        replies.Clear();
+        apply.Invoke(form,new object[] {FastMessage("200",1)});
+        apply.Invoke(form,new object[] {FastMessage("100",1)});
+        apply.Invoke(form,new object[] {FastMessage("100",3)});
+        Check(replies.Count == 1 && (bool)Field(form,"fastNeedsRecovery"), "thread mode filters other threads and requests recovery on a missing response");
+        apply.Invoke(form,new object[] {FastMessage("100",2)});
+        apply.Invoke(form,new object[] {FastMessage("100",1)});
+        Check(replies.Count == 2, "thread mode appends sequential replies once without duplicate replay");
+        FastSnapshotChecks(form,browser,replies,apply);
+    }
+
+    static void FastSnapshotChecks(FormMain form, WebBrowser browser, System.Collections.IList replies, MethodInfo apply)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        for (int i = 3; i <= 60; i++) apply.Invoke(form,new object[] {FastMessage("100",i)});
+        Script(browser,"scrollToY",300);
+        int position = Convert.ToInt32(Script(browser,"scrollTop"));
+        form.CurrentResNumber = 2;
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback,0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        string origin = "http://127.0.0.1:" + port;
+        ((ToolStripTextBox)Field(form,"toolStripTextBoxURL")).Text = origin + "/test/read.cgi/sapio/100/";
+        typeof(FormMain).GetField("oldUrl",flags).SetValue(form,origin + "/sapio/dat/100.dat");
+        FormMain.UserConfig.UseDefaultProxy = false;
+        FormMain.UserConfig.OutputDebugLog = true;
+        string requestHeaders = "";
+        var server = System.Threading.Tasks.Task.Run(delegate {
+            using (var client = listener.AcceptTcpClient())
+            using (var stream = client.GetStream())
+            {
+                var reader = new StreamReader(stream,System.Text.Encoding.ASCII,false,1024,true);
+                string line;
+                while (!string.IsNullOrEmpty(line = reader.ReadLine())) requestHeaders += line + "\n";
+                var body = new System.Text.StringBuilder();
+                for (int i = 1; i <= 61; i++) body.Append("name<>sage<>2026/10/19 12:34:56 ID:a<>reply " + i + "<>title\n");
+                byte[] data = System.Text.Encoding.ASCII.GetBytes(body.ToString());
+                byte[] headers = System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: " + data.Length + "\r\nConnection: close\r\n\r\n");
+                stream.Write(headers,0,headers.Length); stream.Write(data,0,data.Length);
+            }
+        });
+        var previousContext = System.Threading.SynchronizationContext.Current;
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+        try
+        {
+            var fetch = (System.Threading.Tasks.Task)typeof(FormMain).GetMethod("GetFromURLNext",flags).Invoke(form,null);
+            var watch = Stopwatch.StartNew();
+            while (!fetch.IsCompleted && watch.ElapsedMilliseconds < 15000) { Application.DoEvents(); System.Threading.Thread.Sleep(10); }
+            Check(fetch.IsCompleted,"Fast recovery HTTP request completes without blocking UI");
+            fetch.GetAwaiter().GetResult();
+            server.GetAwaiter().GetResult();
+            if (replies.Count != 61) Console.WriteLine("Recovery diagnostics: replies=" + replies.Count + " headers=" + requestHeaders + " log=" + ((TextBox)Field(form,"textBoxLog")).Text);
+            Check(!requestHeaders.Contains("Range:") && replies.Count == 61, "Fast recovery uses a full authoritative snapshot instead of a stale DAT range");
+            Check(Convert.ToInt32(Script(browser,"eval","document.getElementById('resArea').children.length")) == 61, "snapshot recovery rebuilds all visible replies exactly once");
+            Check(form.CurrentResNumber == 2 && Convert.ToInt32(Script(browser,"scrollTop")) == position, "snapshot recovery preserves reading and scroll positions");
+        }
+        finally { listener.Stop(); System.Threading.SynchronizationContext.SetSynchronizationContext(previousContext); }
     }
 
     static void SoundChecks()

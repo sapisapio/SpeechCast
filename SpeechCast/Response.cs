@@ -14,6 +14,12 @@ namespace SpeechCastMe
         public string Html = null;
 
         public int Number = -1;
+        // Number indexes the playback queue; Fast board feeds retain the original
+        // response number and thread separately for display, speech and links.
+        public int SourceNumber = -1;
+        public string SourceThreadUrl;
+        public string SourceLabel;
+        public int DisplayNumber { get { return SourceNumber > 0 ? SourceNumber : Number; } }
         public string Name = null;
         public string MailAddress = null;
         public string DateTime = null;
@@ -180,7 +186,7 @@ namespace SpeechCastMe
         {
             ListViewItem item = new ListViewItem();
 
-            item.Text = Number.ToString();
+            item.Text = DisplayNumber.ToString();
             item.SubItems.Add(Name);
             item.SubItems.Add(Text);
             item.Tag = this;
@@ -251,12 +257,15 @@ namespace SpeechCastMe
             // UI refresh, 2026-10-18: encode board text before building display markup.
             content = HttpUtility.HtmlEncode(ConvertToText(content)).Replace("\r\n", "\n");
             content = toHtmlRegexUrl.Replace(content, toTextMatchEvalGroupResAnchor);
-            content = toHtmlRegexGtGt.Replace(content, toTextMatchEvalGroupAddLink);
+            content = string.IsNullOrEmpty(SourceThreadUrl)
+                ? toHtmlRegexGtGt.Replace(content, toTextMatchEvalGroupAddLink)
+                : toHtmlRegexGtGt.Replace(content, m => "<a href=\"" + HttpUtility.HtmlAttributeEncode(SourceThreadUrl) + m.Groups[1].Value + "\">" + m.Value + "</a>");
             string timestamp = DateTime ?? "";
             Match date = Regex.Match(timestamp, @"\d{4}/\d{1,2}/\d{1,2}(?:[（(][^）)]*[）)])?");
             Match time = Regex.Match(timestamp, @"\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?");
             return "<div class=\"comment\"><a class=\"anchor\" name=\"res" + Number + "\"></a>"
-                + "<span class=\"meta\"><span class=\"field number\">" + Number + ":</span>"
+                + (string.IsNullOrEmpty(SourceLabel) ? "" : "<a class=\"source-thread\" href=\"" + HttpUtility.HtmlAttributeEncode(SourceThreadUrl) + "\">" + HttpUtility.HtmlEncode(SourceLabel) + "</a> ")
+                + "<span class=\"meta\"><span class=\"field number\">" + DisplayNumber + ":</span>"
                 + "<span class=\"field author\">" + HttpUtility.HtmlEncode(Name) + "</span>"
                 + "<span class=\"field date\">" + HttpUtility.HtmlEncode(date.Value) + "</span>"
                 + "<span class=\"field time\">" + HttpUtility.HtmlEncode(time.Value) + "</span>"
