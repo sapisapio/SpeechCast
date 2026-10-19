@@ -220,6 +220,7 @@
     <Compile Include="JpnknFastClient.cs" />
     <Compile Include="FormMain.Fast.cs" />
     <Compile Include="FormMain.Voices.cs" />
+    <Compile Include="FormMain.Reading.cs" />
     <Compile Include="OneCoreVoices.cs" />
     <Compile Include="SpeechEngine.cs" />
     <Compile Include="ToolbarIcons.cs" />

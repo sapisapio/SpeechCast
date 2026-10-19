@@ -154,6 +154,11 @@ namespace SpeechCastMe
         public bool EnableAutoScroll = false;
 
         /// <summary>
+        /// 自動送り：読み終えたら次のレスへ自動で進む（OFFで自分のペースで1つずつ）
+        /// </summary>
+        public bool AutoAdvance = true;
+
+        /// <summary>
         /// 自動スクロールスピード
         /// </summary>
         public int AutoScrollSpeed = 1;

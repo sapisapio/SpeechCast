@@ -12,7 +12,7 @@ namespace SpeechCastMe
         private JpnknFastTarget fastTarget;
         private JpnknFastClient fastClient;
         private int fastGeneration;
-        private bool fastConnected, readingPaused, syncingFeedMode, loadingThread;
+        private bool fastConnected, syncingFeedMode, loadingThread;
         private bool fastNeedsRecovery;
         private int fastExpectedNumber;
         private DateTime lastFastRecovery = DateTime.MinValue;
@@ -69,16 +69,17 @@ namespace SpeechCastMe
             StopFastClient();
             fastTarget = null;
             fastPending.Clear(); fastSeen.Clear(); fastSeenOrder.Clear();
-            readingPaused = false;
             fastExpectedNumber = 0;
             fastNeedsRecovery = false;
+            // A new thread or board starts without a highlighted reply.
+            lastSpokenNumber = 0;
+            if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setCurrent", new object[] { 0, false });
             if (fastStatusLabel != null) fastStatusLabel.Available = false;
         }
 
         private void OnFastAcquisitionChanged(bool enabled)
         {
             if (fastTarget == null) return;
-            readingPaused = false;
             if (enabled) EnsureFastSubscription(); else StopFastClient();
         }
 
@@ -174,6 +175,8 @@ namespace SpeechCastMe
             listViewResponses.EndUpdate();
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("trimRes", new object[] { count });
             CurrentResNumber -= count;
+            lastSpokenNumber = Math.Max(0, lastSpokenNumber - count);
+            HighlightSpoken(false);
         }
 
         private void DrainFastMessages()

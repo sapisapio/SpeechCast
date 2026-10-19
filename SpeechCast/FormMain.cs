@@ -84,6 +84,8 @@ namespace SpeechCastMe
             {
                 e.Cancel = true;
                 string resNoStr = url.Substring(Response.AnchorUrl.Length, url.Length - Response.AnchorUrl.Length);
+                // A click on a comment body (resView.html) reads that reply.
+                if (resNoStr.StartsWith("read/")) { ReadClickedResponse(resNoStr.Substring(5)); return; }
                 int resNo = System.Convert.ToInt32(resNoStr);
 
                 if (resNo > 0 && resNo <= responses.Count)
@@ -954,7 +956,6 @@ namespace SpeechCastMe
             {
                 bool changed = toolStripButtonAutoUpdate.Checked != value;
                 toolStripButtonAutoUpdate.Checked = value;
-                if (changed && value) readingPaused = false;
                 if (value)
                 {
                     ScrollToDocumentEnd();
@@ -968,7 +969,6 @@ namespace SpeechCastMe
                 }
                 else communicationStatusString = "";
                 if (changed) OnFastAcquisitionChanged(value);
-                UpdateReadingUi();
             }
         }
 
@@ -1002,7 +1002,7 @@ namespace SpeechCastMe
 
         private void StartSpeaking(int resNumber)
         {
-            StopSpeaking();
+            StopSpeakingCore();
 
             CurrentResNumber = resNumber;
             StartSpeakingAsync();
@@ -1024,6 +1024,7 @@ namespace SpeechCastMe
             if (CurrentResNumber <= responses.Count && CurrentResNumber <= CurrentResponseLimit)
             {
                 Response res = responses[CurrentResNumber - 1];
+                MarkSpoken(CurrentResNumber);
                 string text = res.Text;
 
                 if (UserConfig.IncludesNGWord(res.RawText))
@@ -1417,13 +1418,12 @@ namespace SpeechCastMe
         public void StopSpeaking()
         {
             StopSpeakingCore();
-            // Stopping pauses reading only; fetching new replies (auto update)
-            // keeps running. ▶ resumes continuous reading.
-            readingPaused = true;
-            UpdateReadingUi();
+            // ⏹ stops reading and turns auto-advance off (the lit button goes out);
+            // fetching new replies (auto update) keeps running.
+            SetAutoAdvance(false);
         }
 
-        private void StopSpeakingCore()
+        public void StopSpeakingCore()
         {
             notificationPlayer.Stop();
             FormCaption.Instance.CaptionText = "";
@@ -1504,7 +1504,7 @@ namespace SpeechCastMe
         // 読み上げ管理用バックグラウンドプロセス
         private void timer_Tick(object sender, EventArgs e)
         {
-            if (UserConfig.EnableAutoScroll) webBrowser.Document.InvokeScript("scrollByY", new object[] { UserConfig.AutoScrollSpeed });
+            UpdateUnreadStatus();
             diff = System.DateTime.Now - speakingCompletedTime;
             diffWeb = System.DateTime.Now - gettingWebTime;
             if (CurrentResNumber != UserConfig.endThreadWarningResCount) endThreadWarning = false;
@@ -1628,7 +1628,7 @@ namespace SpeechCastMe
                 if (
                     diff.TotalMilliseconds >= speakingInvervalMillsec
                     && AutoUpdate
-                    && !readingPaused
+                    && UserConfig.AutoAdvance
                     //&& responses.Count >= CurrentResNumber
                     )
                 {
@@ -1825,7 +1825,7 @@ namespace SpeechCastMe
                     toolStripButtonPlaySoundNewResponse.Checked = UserConfig.PlaySoundNewResponse;
                     this.splitContainerResCaption.SplitterDistance = 2000;
                     this.splitContainerResCaption.IsSplitterFixed = true;
-                    toolStripButtonAutoScroll.Checked = UserConfig.EnableAutoScroll;
+                    toolStripButtonAutoScroll.Checked = UserConfig.AutoAdvance;
                     toolStripButtonListToggle.Checked = !UserConfig.ViewResList;
                     toolStripTextBoxThreadKeyword.Text = UserConfig.ThreadKeyword;
                     // ミミック勝手に改造 代替字幕の設定を保存
@@ -2189,7 +2189,7 @@ namespace SpeechCastMe
 
             if (!string.IsNullOrEmpty(text))
             {
-                StopSpeaking();
+                StopSpeakingCore();
                 isSpeaking = true;
                 speakClipboard = true;
                 isSpeakingWarningMessage = false;
@@ -2730,8 +2730,7 @@ namespace SpeechCastMe
         // オートスクロールのONOFF
         private void toolStripButtonAutoScroll_Click(object sender, EventArgs e)
         {
-            UserConfig.EnableAutoScroll = !UserConfig.EnableAutoScroll;
-            toolStripButtonAutoScroll.Checked = UserConfig.EnableAutoScroll;
+            SetAutoAdvance(!UserConfig.AutoAdvance);
         }
 
         private void toolStripButton19_Click(object sender, EventArgs e)

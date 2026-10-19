@@ -27,28 +27,22 @@ namespace SpeechCastMe
             SetIconButton(toolStripButtonThreads, "threads", "スレッド一覧");
             SetIconButton(toolStripButtonResponse, "write", "レスを書く");
             SetIconButton(toolStripButtonFirst, "first", "最初のレス");
-            SetIconButton(toolStripButtonPrev, "prev", "前のレス");
-            SetIconButton(toolStripButtonStop, "stop", "停止");
+            SetIconButton(toolStripButtonPrev, "prev", "前のレスを読む");
+            SetIconButton(toolStripButtonStop, "stop", "停止（読み上げを止め、自動送りをOFF。自動更新は続く）");
             var play = playButton = new ToolStripButton { Name = "playCurrentResponse" };
-            SetIconButton(play, "play", "読み上げ再開（自動更新ONの間は順に読み進める）");
-            play.Click += delegate {
-                if (IsDesignPreview || responses.Count == 0) return;
-                var selected = GetSelectedResonse();
-                StartSpeaking(selected != null ? selected.Number : Math.Max(1, Math.Min(CurrentResNumber, responses.Count)));
-                readingPaused = false;
-                UpdateReadingUi();
-            };
-            SetIconButton(toolStripButtonNext, "next", "次のレス");
-            SetIconButton(toolStripButtonLast, "last", "最後のレス");
+            SetIconButton(play, "play", "今のレスをもう一度読む");
+            play.Click += delegate { ReplayCurrentResponse(); };
+            SetIconButton(toolStripButtonNext, "next", "次のレスを読む");
+            SetIconButton(toolStripButtonLast, "last", "最新のレスを読む");
             toolStripButtonTurbo.Text = "ターボ";
             toolStripButtonTurbo.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonTurbo.ToolTipText = "ターボモード ON / OFF";
-            // The switches used every broadcast lead the row: auto update, auto
-            // scroll and jump to latest; then playback, then comment zoom.
-            SetIconButton(toolStripButtonAutoUpdate, "update", "自動更新 ON / OFF（ONで末尾へ移動）");
+            // The switches used every broadcast lead the row: auto update (fetch
+            // new replies), auto-advance (read on and follow) and jump to latest.
+            SetIconButton(toolStripButtonAutoUpdate, "update", "自動更新 ON / OFF：新しいレスを取得する（ONで末尾へ移動）");
             SetLabelledIcon(toolStripButtonAutoUpdate, "自動更新");
-            SetIconButton(toolStripButtonAutoScroll, "autoscroll", "自動スクロール ON / OFF（読み上げに合わせてコメント欄を送る）");
-            SetLabelledIcon(toolStripButtonAutoScroll, "スクロール");
+            SetIconButton(toolStripButtonAutoScroll, "autoscroll", "自動送り ON / OFF：読み終えたら次のレスへ進む。OFFで⏩やコメントのクリックで1つずつ読む");
+            SetLabelledIcon(toolStripButtonAutoScroll, "自動送り");
             SetIconButton(toolStripButtonZoomOutnResView, "zoomout", "コメント文字を小さく");
             SetIconButton(toolStripButtonZoomInResView, "zoomin", "コメント文字を大きく");
             SetIconButton(toolStripButtonMoveBottom, "bottom", "最新レスへ移動");
@@ -99,9 +93,9 @@ namespace SpeechCastMe
             presentationMenu = new ToolStripMenuItem("コメントだけ表示  (F11)");
             presentationMenu.Click += delegate { TogglePresentation(); };
             appearance.DropDownItems.Add(presentationMenu);
-            var autoScroll = new ToolStripMenuItem("自動スクロール") { CheckOnClick = true };
+            var autoScroll = new ToolStripMenuItem("自動送り");
             autoScroll.Click += delegate { toolStripButtonAutoScroll.PerformClick(); };
-            appearance.DropDownOpening += delegate { autoScroll.Checked = UserConfig != null && UserConfig.EnableAutoScroll; };
+            appearance.DropDownOpening += delegate { autoScroll.Checked = UserConfig != null && UserConfig.AutoAdvance; };
             appearance.DropDownItems.Add(autoScroll);
             appearance.DropDownItems.Add("レス一覧の表示切替", null, delegate { toolStripButtonListToggle.PerformClick(); });
             appearance.DropDownItems.Add("代替字幕を開く", null, delegate { openResCaptionForm(); });
@@ -119,6 +113,7 @@ namespace SpeechCastMe
             myToolStripUrl.Items.Clear();
             myToolStripUrl.Items.AddRange(new ToolStripItem[] { toolStripTextBoxURL, toolStripLabel7, toolStripTextBoxThreadKeyword, toolStripButtonAutoNextThread });
             InitializeFastUi();
+            InitializeReadingUi();
             toolStripLabel7.Text = "次スレキーワード";
             toolStripButtonAutoNextThread.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonAutoNextThread.ToolTipText = "次スレへ自動移動 ON / OFF";
@@ -163,13 +158,6 @@ namespace SpeechCastMe
         }
 
         private ToolStripButton playButton;
-
-        // ▶ is lit while replies are read through continuously (auto update ON
-        // and reading not paused by ⏹ or a manual step).
-        private void UpdateReadingUi()
-        {
-            if (playButton != null) playButton.Checked = AutoUpdate && !readingPaused;
-        }
 
         private static void SetLabelledIcon(ToolStripButton button, string label)
         {

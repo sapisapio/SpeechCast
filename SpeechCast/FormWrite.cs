@@ -141,7 +141,7 @@ namespace SpeechCastMe
 
         private void buttonPlay_Click(object sender, EventArgs e)
         {
-            FormMain.Instance.StopSpeaking();
+            FormMain.Instance.StopSpeakingCore();
             FormMain.Instance.StartSpeaking(this.textBoxContents.Text);
         }
 

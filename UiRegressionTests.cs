@@ -262,13 +262,14 @@ class UiRegressionTests
             var autoScroll = (ToolStripButton)Field(form,"toolStripButtonAutoScroll");
             Func<string, int> index = name => play.Items.IndexOf((ToolStripItem)Field(form,name));
             Check(index("toolStripButtonThreads") == 0 && index("toolStripButtonResponse") == 1 && play.Items[2] is ToolStripSeparator, "thread list and write stay first, then a separator");
-            Check(play.Items.IndexOf(autoUpdate) == 3 && play.Items.IndexOf(autoScroll) == 4 && index("toolStripButtonMoveBottom") == 5 && play.Items[6] is ToolStripSeparator && index("toolStripButtonFirst") == 7 && autoScroll.Text == "スクロール" && autoScroll.Enabled, "auto update, auto scroll and jump to latest come before playback");
+            Check(play.Items.IndexOf(autoUpdate) == 3 && play.Items.IndexOf(autoScroll) == 4 && index("toolStripButtonMoveBottom") == 5 && play.Items[6] is ToolStripSeparator && index("toolStripButtonFirst") == 7 && autoScroll.Text == "自動送り" && autoScroll.Enabled, "auto update, auto-advance and jump to latest come before playback");
             Func<string, int> left = name => ((ToolStripItem)Field(form,name)).Bounds.Left;
             Check(left("toolStripButtonTurbo") < left("toolStripButtonZoomOutnResView"), "playback controls come before comment zoom");
-            bool scrolling = FormMain.UserConfig.EnableAutoScroll;
+            bool advancing = FormMain.UserConfig.AutoAdvance;
             autoScroll.PerformClick();
-            Check(FormMain.UserConfig.EnableAutoScroll != scrolling && autoScroll.Checked == FormMain.UserConfig.EnableAutoScroll, "auto scroll button toggles the setting");
+            Check(FormMain.UserConfig.AutoAdvance != advancing && autoScroll.Checked == FormMain.UserConfig.AutoAdvance, "auto-advance button toggles the setting");
             autoScroll.PerformClick();
+            ReadingChecks(form, browser);
             foreach (var name in new[] { "toolStripButtonCaption", "toolStripButtonShowCaptionImmediately", "toolStripButtonBorder", "toolStripButtonOpenResCaptionForm", "toolStripButtonFirst", "toolStripButtonMoveBottom" })
             {
                 var button = (ToolStripButton)typeof(FormMain).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).GetValue(form);
@@ -421,16 +422,14 @@ class UiRegressionTests
         form.StopSpeaking();
         int before = replies.Count;
         apply.Invoke(form,new object[] {FastMessage("400",1)});
-        Check(form.AutoUpdate && replies.Count == before + 1 && (bool)Field(form,"readingPaused"), "pausing reading keeps board-wide acquisition running");
-        var playButton = (ToolStripButton)Field(form,"playButton");
-        Check(!playButton.Checked, "paused reading leaves the play button unlit");
+        Check(form.AutoUpdate && replies.Count == before + 1 && !FormMain.UserConfig.AutoAdvance, "stop turns auto-advance off while board-wide acquisition keeps running");
+        form.SetAutoAdvance(true);
         Check((int)typeof(FormMain).GetProperty("CurrentResponseLimit",flags).GetValue(form,null) == int.MaxValue, "board feed does not stop at a single-thread 1000-response boundary");
         form.AutoUpdate = false;
         before = replies.Count;
         apply.Invoke(form,new object[] {FastMessage("400",2)});
         Check(replies.Count == before, "turning acquisition off stops new board arrivals");
         form.AutoUpdate = true;
-        Check(!(bool)Field(form,"readingPaused") && playButton.Checked, "turning auto update on resumes continuous reading and lights play");
         before = replies.Count;
         JpnknFastMessage shortBody;
         Check(JpnknFastMessage.TryParse("bbs/sapio","{\"bbsid\":\"sapio\",\"threadkey\":\"500\",\"no\":1,\"body\":\"名無し<>sage<>2026/10/19 ID:a<>末尾区切りなし\"}",out shortBody), "Fast body without a trailing field parses");
@@ -450,9 +449,50 @@ class UiRegressionTests
         Check(replies.Count == 2, "thread mode appends sequential replies once without duplicate replay");
         form.StopSpeaking();
         apply.Invoke(form,new object[] {FastMessage("100",3)});
-        Check(form.AutoUpdate && (bool)Field(form,"readingPaused") && replies.Count == 3, "stopping or stepping in thread mode pauses reading but keeps auto update on");
+        Check(form.AutoUpdate && !FormMain.UserConfig.AutoAdvance && replies.Count == 3, "stop in thread mode turns auto-advance off but keeps auto update on");
+        form.SetAutoAdvance(true);
         form.AutoUpdate = false; form.AutoUpdate = true;
         FastSnapshotChecks(form,browser,replies,apply);
+    }
+
+    static void ReadingChecks(FormMain form, WebBrowser browser)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        Func<HtmlElement, bool> isCurrent = div => (" " + div.GetAttribute("className") + " " + div.GetAttribute("class") + " ").Contains(" current ");
+        Func<string> current = () => {
+            foreach (HtmlElement div in browser.Document.GetElementsByTagName("div"))
+                if (isCurrent(div)) return div.GetElementsByTagName("a")[0].GetAttribute("name");
+            return null;
+        };
+        typeof(FormMain).GetMethod("MarkSpoken", flags).Invoke(form, new object[] { 5 });
+        var list = (System.Collections.IList)Field(form, "responses");
+        Func<int, string> anchorOf = position => "res" + list[position - 1].GetType().GetField("Number").GetValue(list[position - 1]);
+        Check(current() == anchorOf(5), "the reply being read is highlighted in the comment view");
+        typeof(FormMain).GetMethod("MarkSpoken", flags).Invoke(form, new object[] { 6 });
+        int highlighted = 0;
+        foreach (HtmlElement div in browser.Document.GetElementsByTagName("div")) if (isCurrent(div)) highlighted++;
+        Check(current() == anchorOf(6) && highlighted == 1, "only one reply is highlighted at a time");
+        HtmlElement target = null;
+        foreach (HtmlElement anchor in browser.Document.GetElementsByTagName("a")) if (anchor.GetAttribute("name") == anchorOf(9)) target = anchor.Parent;
+        bool preview = (bool)typeof(FormMain).GetField("IsDesignPreview", flags).GetValue(form);
+        typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, false);
+        try
+        {
+            target.InvokeMember("click");
+            for (int i = 0; i < 50; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(5); }
+            Check((int)typeof(FormMain).GetField("lastSpokenNumber", flags).GetValue(form) == 9 && current() == anchorOf(9), "clicking a comment reads that reply and moves the highlight");
+            form.StopSpeakingCore();
+        }
+        finally { typeof(FormMain).GetField("IsDesignPreview", flags).SetValue(form, preview); }
+        int count = ((System.Collections.IList)Field(form, "responses")).Count;
+        form.SetAutoAdvance(false);
+        typeof(FormMain).GetField("lastSpokenNumber", flags).SetValue(form, 9);
+        form.CurrentResNumber = 10;
+        typeof(FormMain).GetMethod("UpdateUnreadStatus", flags).Invoke(form, null);
+        var unread = (ToolStripStatusLabel)Field(form, "unreadStatusLabel");
+        Check(unread.Available && unread.Text == "未読 " + (count - 9), "with auto-advance off the unread count is shown");
+        form.SetAutoAdvance(true);
+        Check(!unread.Available, "unread count hides when auto-advance is on");
     }
 
     static void BoardTrimChecks(FormMain form, WebBrowser browser, System.Collections.IList replies, MethodInfo apply)
