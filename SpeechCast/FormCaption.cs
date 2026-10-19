@@ -16,7 +16,7 @@ namespace SpeechCastMe
         {
             InitializeComponent();
             // Same icon as the application (shown in the taskbar and OBS window list).
-            Icon = AppIcon.Value;
+            AppIcon.Apply(this);
             this.titleText = "SpeechcastSP";
         }
 

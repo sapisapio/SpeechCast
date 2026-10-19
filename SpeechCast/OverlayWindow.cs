@@ -25,7 +25,7 @@ namespace SpeechCastMe
             Bounds = bounds;
             TopMost = true;
             ShowInTaskbar = true;
-            Icon = AppIcon.Value;
+            AppIcon.Apply(this);
             // A size set before the handle exists is reduced by the default frame
             // once the window is created; apply the requested bounds again.
             Load += delegate { Bounds = bounds; };

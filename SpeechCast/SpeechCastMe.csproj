@@ -354,7 +354,7 @@
     <EmbeddedResource Include="app3.ico">
       <LogicalName>SpeechCastMe.app.ico</LogicalName>
     </EmbeddedResource>
-    <None Include="Assets\sc-icon-master.png" />
+    <None Include="Assets\supi-icon-master.png" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Service References\" />

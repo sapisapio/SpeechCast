@@ -1,4 +1,4 @@
-// Export the SC artwork as a multi-resolution Windows icon. GPLv2.
+// Export app artwork as a multi-resolution Windows icon. GPLv2.
 // csc /r:System.Drawing.dll CreateScIcon.cs
 // CreateScIcon.exe SpeechCast/Assets/sc-icon-master.png SpeechCast/app3.ico [preview.png]
 using System;
@@ -14,7 +14,8 @@ class CreateScIcon
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]
     static extern IntPtr LoadImage(IntPtr instance, string file, uint type, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr handle);
-    static readonly int[] Sizes = {16,20,24,32,40,48,64,96,128,256};
+    // Include the user's RocketDock normal/zoom sizes to avoid upscaling 48/128px.
+    static readonly int[] Sizes = {16,20,24,32,40,48,55,64,96,128,137,192,256};
     static Bitmap Resize(Image source, int size)
     {
         var result = new Bitmap(size,size,PixelFormat.Format32bppArgb);
@@ -119,6 +120,6 @@ class CreateScIcon
                 }
             }
         }
-        Console.WriteLine("Validated 10 ICO sizes, 32-bit alpha, native Windows decoding.");
+        Console.WriteLine("Validated " + Sizes.Length + " ICO sizes, 32-bit alpha, native Windows decoding.");
     }
 }

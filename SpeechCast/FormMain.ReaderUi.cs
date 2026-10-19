@@ -13,7 +13,7 @@ namespace SpeechCastMe
         private void InitializeReaderUi()
         {
             Font = new Font("Yu Gothic UI", 10F);
-            Icon = AppIcon.Value;
+            AppIcon.Apply(this);
             BackColor = Color.FromArgb(248, 250, 252);
             MinimumSize = new Size(240, 220);
             // 2026-10-18: keep the original three rows and their existing handlers.

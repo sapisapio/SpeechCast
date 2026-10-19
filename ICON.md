@@ -1,20 +1,45 @@
-# SC icon
+# スピキャスのアイコン
 
-2026-10-19。提供された旧32pxアイコンを参考に、黒・白の円形バッジとして再制作。Sを左上、Cを右下に置く構成を維持し、文字を太めの幾何学的な斜体へ変更しました。アプリ名はSpeech Cast SPのままです。
+青い円に白い「ス」「ピ」を段違いに置いた案06。円はキャンバス横幅の約99.8%。マスター: `SpeechCast/Assets/supi-icon-master.png`。ICO: `SpeechCast/app3.ico`。旧sc-icon-master.pngは過去のSC案です。
 
-マスター画像：`SpeechCast/Assets/sc-icon-master.png`（透過PNG）。アプリアイコン：`SpeechCast/app3.ico`。
+## 再生成
 
-ICOには16・20・24・32・40・48・64・96・128・256pxを収録。全フレーム32bitアルファで、256pxはPNG圧縮、それ以外は32bit DIBとANDマスクです。WindowsのLoadImageで全10サイズの読み込み・寸法・透明な角を検証しています。
-
-再書き出し：
+16/20/24/32/40/48/55/64/96/128/137/192/256pxの13サイズ。55/137pxはRocketDockの通常/拡大サイズ。各フレームは高解像度マスターから直接縮小。全て32bit alpha、256pxはPNG、他はDIB＋ANDマスク。
 
 ```powershell
 csc /r:System.Drawing.dll CreateScIcon.cs
-./CreateScIcon.exe SpeechCast/Assets/sc-icon-master.png SpeechCast/app3.ico preview.png
+./CreateScIcon.exe SpeechCast/Assets/supi-icon-master.png SpeechCast/app3.ico preview.png
 ```
 
-画像の制作には組み込みのimage_genを使用。ICOへの変換・縮小とサイズ確認はCreateScIcon.csで実施しました。
+## にじみの原因と対策
 
-## Generation prompt
+元のAppIconのnew Icon(stream)は32pxを選択します。さらに.NET Frameworkでは、256pxを指定しても、ICOディレクトリ上の幅0の画像を選ばず、元の4サイズICOでは48px、旧10サイズICOでは128pxが選択されました。WinFormsは選択されたハンドルをWM_SETICON/ICON_BIGに渡すため、実行中のウィンドウから取得するドック等では小画像が拡大される経路がありました。
 
-Redesign this tiny legacy Windows application icon into ONE finished, crisp, modern app icon, square canvas, high resolution, transparent outside a circular badge. Preserve its identity: exactly two uppercase letters S and C in a diagonal composition, S in the upper-left area and C in the lower-right area. The old red S / yellow C / blue background are ONLY a composition reference; replace ALL colors. New palette: near-black circular disk and pure white lettering, with a very fine neutral light-gray outer rim so the icon remains visible on a dark Windows taskbar. An OBS-like restrained monochrome aesthetic, but an original SC typographic monogram, absolutely no OBS swirl symbol. Use a sophisticated, sturdy, slightly oblique modern geometric sans-serif font with smooth rounded curves, optically balanced, bold enough for 16px use, not generic Times serif or calligraphy. Make both letters large and clearly recognizable as S and C; some diagonal overlap is fine but keep their silhouettes visually separate and avoid ambiguous merged shapes. Circle almost fills the square with consistent 4 percent transparent padding. Flat vector-like graphic, razor-clean contours, carefully balanced optical margins, no texture, no lighting, no gradients, no 3D, no shadow outside the circle, no extraneous symbols, no extra text. Deliver just the standalone centered circular black-and-white SC icon on actual transparent background, not a mockup or presentation sheet.
+AppIconは埋め込みICOの最大フレームをCreateIconFromResourceExで直接デコードし、所有する256pxハンドルを保持。タイトルバーにはシステムの小アイコンサイズの専用フレームを設定し、WinFormsの更新とハンドル再作成でも保持します。
+
+新規パスのEXEとICOは、PrivateExtractIcons、およびShellのIShellItemImageFactoryの両経路で32/48/55/64/96/128/137/256pxが画素差0でした。cscの埋め込み自体の劣化はこの調査では再現していません。リソースID変更、DPI宣言変更、OS全体のキャッシュ削除は行っていません。
+
+## 検証
+
+```powershell
+csc /platform:x86 /r:System.Drawing.dll /r:System.Windows.Forms.dll IconRegressionTests.cs
+./IconRegressionTests.exe SpeechCast/app3.ico path/to/SpeechCastSP.exe
+```
+
+13サイズのICO/EXE画素一致、埋め込みリソース一致、旧32px選択、修正版256px、タイトルバー専用フレーム、ハンドル再作成、標準ダイアログを検証します。通常の非表示Formを使い、SpeechCast本体やネットワークは起動しません。
+
+実際のRocketDockの見え方は未確認です。新しい配布フォルダーのEXEを登録して、未起動時/起動中で比較してください。必要ならICOの明示指定と比較できます。
+
+参考: [WinForms Form実装](https://referencesource.microsoft.com/System.Windows.Forms/winforms/Managed/System/WinForms/Form.cs.html)、[CreateIconFromResourceEx](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createiconfromresourceex)。
+
+## 図案の制作
+
+組み込みimage_genで元画像を制作。透明余白のクロップ、サイズ別の縮小とICO形式変換はC#。
+
+### 制作プロンプト
+
+Finalize EXACTLY concept 06, the BOTTOM RIGHT BLUE CIRCLE in the reference catalog as ONE standalone high-resolution Windows desktop app icon. Reference role: exact design source, use bottom-right BLUE version only, NOT black. Circle must be solid rich true blue #2454AE. Preserve concept06's bold softly squared white Japanese characters and staggered composition: ス upper-left and ピ lower-right. Text exactly スピ, two characters. Both upright, no italic or rotation. Preserve glyph proportions, spacing, scale and silhouette. ピ must have clearly open circular handakuten on upper right not touching perimeter. One entire fully opaque BLUE DISK including all space between characters and hole in handakuten. White lettering fully opaque pure white. ONLY area OUTSIDE the BLUE circle is transparent; do not erase any part of blue disk. Square canvas, centered circle occupying 92 percent width with 4 percent clear margin each edge. Crisp antialiased edges and flat uniform solid colors, suitable for large dock launchers and tiny taskbar. No black circle, gold, rim, border, sound wave, shadows, texture, grain, gradient, gloss, 3D, labels, other text, numbers, thumbnails or other designs. Just the selected blue circular icon on genuine transparent background.
+
+### 透過ムラ修正プロンプト
+
+Correct this icon's alpha defects ONLY. Preserve the exact white スピ lettering, staggered layout, rich blue color, circle size, spacing and transparent outer background. Fill the entire blue disk with perfectly UNIFORM OPAQUE solid #2454AE blue, including upper-right patchy area. No semitransparent spots, no holes, no mottling, no gradient or texture anywhere within the circle. White glyphs also fully opaque. Only outside the perfectly smooth circular perimeter is transparent. Clean flat professional icon, all original shapes unchanged.
