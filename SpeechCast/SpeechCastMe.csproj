@@ -383,6 +383,14 @@
     <PackageReference Include="MQTTnet" Version="3.1.2" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Normalize the generated Win32 resource before copying the EXE to bin.
+       No external resource editor or SDK resource compiler is required. -->
+  <Target Name="NormalizeAppIconGroup" AfterTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Csc Sources="$(MSBuildProjectDirectory)\..\NormalizeAppIcon.cs"
+         OutputAssembly="$(IntermediateOutputPath)NormalizeAppIcon.exe"
+         TargetType="Exe" References="System.dll" />
+    <Exec Command="&quot;$(IntermediateOutputPath)NormalizeAppIcon.exe&quot; &quot;@(IntermediateAssembly)&quot;" />
+  </Target>
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>

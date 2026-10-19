@@ -13,6 +13,8 @@ csc /r:System.Drawing.dll CreateScIcon.cs
 
 ## にじみの原因と対策
 
+RocketDockに固有の原因と最新対策は[ROCKETDOCK-ICON.md](ROCKETDOCK-ICON.md)を参照してください。C#標準のRT_GROUP_ICON #32512をビルド時に#1へ変更し、RocketDockの12bit切り詰めによる32pxフォールバックを避けます。以下は実行中ウィンドウ向けの別の修正です。
+
 元のAppIconのnew Icon(stream)は32pxを選択します。さらに.NET Frameworkでは、256pxを指定しても、ICOディレクトリ上の幅0の画像を選ばず、元の4サイズICOでは48px、旧10サイズICOでは128pxが選択されました。WinFormsは選択されたハンドルをWM_SETICON/ICON_BIGに渡すため、実行中のウィンドウから取得するドック等では小画像が拡大される経路がありました。
 
 AppIconは埋め込みICOの最大フレームをCreateIconFromResourceExで直接デコードし、所有する256pxハンドルを保持。タイトルバーにはシステムの小アイコンサイズの専用フレームを設定し、WinFormsの更新とハンドル再作成でも保持します。
