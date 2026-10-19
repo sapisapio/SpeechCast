@@ -17,6 +17,8 @@ namespace SpeechCastMe
         private int fastExpectedNumber;
         private DateTime lastFastRecovery = DateTime.MinValue;
         private readonly HashSet<string> fastSeen = new HashSet<string>();
+        private readonly Queue<string> fastSeenOrder = new Queue<string>();
+        private const int FastSeenLimit = 20000, BoardFeedLimit = 3000, BoardFeedKeep = 2000;
         private readonly Queue<JpnknFastMessage> fastPending = new Queue<JpnknFastMessage>();
         private bool IsFastBoardFeed { get { return fastTarget != null && fastTarget.Thread == null; } }
         private int CurrentResponseLimit { get { return IsFastBoardFeed ? int.MaxValue : Response.MaxResponseCount; } }
@@ -66,7 +68,7 @@ namespace SpeechCastMe
         {
             StopFastClient();
             fastTarget = null;
-            fastPending.Clear(); fastSeen.Clear();
+            fastPending.Clear(); fastSeen.Clear(); fastSeenOrder.Clear();
             fastReadingPaused = false;
             fastExpectedNumber = 0;
             fastNeedsRecovery = false;
@@ -139,6 +141,8 @@ namespace SpeechCastMe
             if (IsFastBoardFeed)
             {
                 if (!fastSeen.Add(message.Key)) return;
+                fastSeenOrder.Enqueue(message.Key);
+                while (fastSeenOrder.Count > FastSeenLimit) fastSeen.Remove(fastSeenOrder.Dequeue());
             }
             else
             {
@@ -153,6 +157,23 @@ namespace SpeechCastMe
             listViewResponses.Items.Add(response.CreateListViewItem());
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("addRes", new object[] { response.Html });
             NotifyNewResponses(true, oldCount, responses.Count);
+            if (IsFastBoardFeed) TrimBoardFeed();
+        }
+
+        // A board feed never ends, so drop already-read comments from the front
+        // once it grows past the limit. Unread comments are always kept.
+        private void TrimBoardFeed()
+        {
+            if (responses.Count <= BoardFeedLimit) return;
+            int count = Math.Min(responses.Count - BoardFeedKeep, CurrentResNumber - 1);
+            if (count <= 0) return;
+            responses.RemoveRange(0, count);
+            for (int i = 0; i < responses.Count; i++) responses[i].Renumber(i + 1);
+            listViewResponses.BeginUpdate();
+            for (int i = 0; i < count && listViewResponses.Items.Count > 0; i++) listViewResponses.Items.RemoveAt(0);
+            listViewResponses.EndUpdate();
+            if (webBrowser.Document != null) webBrowser.Document.InvokeScript("trimRes", new object[] { count });
+            CurrentResNumber -= count;
         }
 
         private void DrainFastMessages()

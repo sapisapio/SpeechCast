@@ -193,6 +193,20 @@ namespace SpeechCastMe
             return item;
         }
 
+        /// <summary>
+        /// 再生キュー上の番号を振り直す（板全体Fastで古いコメントを捨てたとき）
+        /// </summary>
+        public void Renumber(int number)
+        {
+            if (number == Number) return;
+            if (Html != null)
+            {
+                string oldAnchor = "name=\"res" + Number + "\"";
+                int index = Html.IndexOf(oldAnchor, StringComparison.Ordinal);
+                if (index >= 0) Html = Html.Substring(0, index) + "name=\"res" + number + "\"" + Html.Substring(index + oldAnchor.Length);
+            }
+            Number = number;
+        }
 
         /// <summary>
         /// 空にする

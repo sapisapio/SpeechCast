@@ -65,6 +65,9 @@ namespace SpeechCastMe
                 if (board == null || !Regex.IsMatch(board, @"^[A-Za-z0-9_\-]+$") || topic != "bbs/" + board ||
                     !Regex.IsMatch(thread, @"^\d+$") || body == null || body.Split(new[] { "<>" }, StringSplitOptions.None).Length < 4 ||
                     !int.TryParse(Convert.ToString(data["no"], CultureInfo.InvariantCulture), out number) || number <= 0) return false;
+                // DAT lines end with "<>title" (empty after res 1); accept a body
+                // without the trailing field so Response.SetRawText sees 5 fields.
+                if (body.Split(new[] { "<>" }, StringSplitOptions.None).Length == 4) body += "<>";
                 message = new JpnknFastMessage { Board = board, Thread = thread, Number = number, Body = body };
                 return true;
             }

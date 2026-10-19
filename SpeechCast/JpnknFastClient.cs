@@ -41,6 +41,7 @@ namespace SpeechCastMe
             var token = cancellation.Token;
             while (!token.IsCancellationRequested)
             {
+                string reason = board;
                 using (var connection = new MqttFactory().CreateMqttClient())
                 {
                     var disconnected = new TaskCompletionSource<bool>();
@@ -73,14 +74,11 @@ namespace SpeechCastMe
                         using (token.Register(() => disconnected.TrySetCanceled())) await disconnected.Task.ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) { break; }
-                    catch (Exception ex)
-                    {
-                        if (!token.IsCancellationRequested && ConnectionChanged != null) ConnectionChanged(false, "Fast 再接続待ち：" + ex.Message);
-                    }
+                    catch (Exception ex) { reason = board + "（" + ex.Message + "）"; }
                 }
                 if (token.IsCancellationRequested) break;
                 failures++;
-                if (ConnectionChanged != null) ConnectionChanged(false, "Fast 再接続待ち：" + board);
+                if (ConnectionChanged != null) ConnectionChanged(false, "Fast 再接続待ち：" + reason);
                 try { await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, 3 * failures)), token).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }
             }

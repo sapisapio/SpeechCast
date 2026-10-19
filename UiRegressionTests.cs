@@ -249,6 +249,12 @@ class UiRegressionTests
         apply.Invoke(form,new object[] {FastMessage("400",2)});
         Check(replies.Count == before, "turning acquisition off stops new board arrivals");
         form.AutoUpdate = true;
+        before = replies.Count;
+        JpnknFastMessage shortBody;
+        Check(JpnknFastMessage.TryParse("bbs/sapio","{\"bbsid\":\"sapio\",\"threadkey\":\"500\",\"no\":1,\"body\":\"名無し<>sage<>2026/10/19 ID:a<>末尾区切りなし\"}",out shortBody), "Fast body without a trailing field parses");
+        apply.Invoke(form,new object[] {shortBody});
+        Check(replies.Count == before + 1, "Fast body without a trailing field is displayed");
+        BoardTrimChecks(form,browser,replies,apply);
         typeof(FormMain).GetMethod("ClearFastSession",flags).Invoke(form,null);
         JpnknFastTarget.TryParse("https://bbs.jpnkn.com/test/read.cgi/sapio/100/",false,out target);
         typeof(FormMain).GetField("fastTarget",flags).SetValue(form,target);
@@ -261,6 +267,22 @@ class UiRegressionTests
         apply.Invoke(form,new object[] {FastMessage("100",1)});
         Check(replies.Count == 2, "thread mode appends sequential replies once without duplicate replay");
         FastSnapshotChecks(form,browser,replies,apply);
+    }
+
+    static void BoardTrimChecks(FormMain form, WebBrowser browser, System.Collections.IList replies, MethodInfo apply)
+    {
+        var list = (ListView)Field(form,"listViewResponses");
+        int number = 1;
+        while (replies.Count < 2600) apply.Invoke(form,new object[] {FastMessage("600",number++)});
+        form.CurrentResNumber = 2501;
+        object current = replies[2500];
+        for (int remaining = 3001 - replies.Count; remaining > 0; remaining--) apply.Invoke(form,new object[] {FastMessage("600",number++)});
+        var type = current.GetType();
+        Check(replies.Count == 2000 && form.CurrentResNumber == 1500 && replies[form.CurrentResNumber - 1] == current, "board feed drops read comments past the limit and keeps the playback position");
+        Check(list.Items.Count == replies.Count && browser.Document.GetElementById("resArea").Children.Count == replies.Count, "list and view stay in step with trimmed comments");
+        Check((int)type.GetField("Number").GetValue(replies[0]) == 1 && ((string)type.GetField("Html").GetValue(replies[0])).Contains("name=\"res1\""), "trimmed comments are renumbered");
+        Script(browser,"scrollToY",0);
+        Check(Convert.ToInt32(Script(browser,"getResTop",1500)) > Convert.ToInt32(Script(browser,"getResTop",1)), "view anchors follow renumbered queue positions");
     }
 
     static void FastSnapshotChecks(FormMain form, WebBrowser browser, System.Collections.IList replies, MethodInfo apply)

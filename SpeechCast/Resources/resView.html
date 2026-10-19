@@ -33,6 +33,7 @@ function anchorSnapshot(){
 }
 function restoreAnchor(saved){scrollToY(saved.node?scrollTop()+saved.node.getBoundingClientRect().top-saved.offset:saved.top);}
 function addRes(res){var top=scrollTop(),node=document.createElement('div');node.innerHTML=res;document.getElementById('resArea').appendChild(node);scrollToY(top);}
+function trimRes(count){var area=document.getElementById('resArea'),saved=anchorSnapshot();for(var i=0;i<count&&area.firstChild;i++)area.removeChild(area.firstChild);var anchors=area.getElementsByTagName('a'),n=0;for(var j=0;j<anchors.length;j++)if(anchors[j].className==='anchor')anchors[j].setAttribute('name','res'+(++n));if(saved.node&&area.contains(saved.node))restoreAnchor(saved);else scrollToY(0);}
 function clearRes(){document.getElementById('resArea').innerHTML='';scrollToY(0);}
 function setZoom(value){var area=document.getElementById('resArea'),next=String(Math.max(.5,Math.min(3,Number(value))));if(String(area.style.zoom)===next)return;var saved=anchorSnapshot();area.style.zoom=next;restoreAnchor(saved);}
 function getResTop(number){var nodes=document.getElementsByName('res'+number);return nodes.length?Math.round(nodes[0].getBoundingClientRect().top+scrollTop()):scrollTop();}
