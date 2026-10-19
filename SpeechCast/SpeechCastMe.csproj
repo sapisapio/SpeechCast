@@ -286,6 +286,9 @@
     <EmbeddedResource Include="FormWrite.resx">
       <DependentUpon>FormWrite.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Fonts\GenEiMGothic2-Black.ttf">
+      <LogicalName>SpeechCastMe.Fonts.GenEiMGothic2-Black.ttf</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <SubType>Designer</SubType>
@@ -312,6 +315,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="BundledFont.cs" />
     <Compile Include="Response.cs" />
     <Compile Include="UseConfig.cs" />
     <Content Include="README.md">

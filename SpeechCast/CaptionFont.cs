@@ -60,7 +60,7 @@ namespace SpeechCastMe
 
         }
 
-        public string Name = "MS UI Gothic";
+        public string Name = BundledFont.FamilyName;
         public float Size = 30;
         public int BorderSize = 3;
         public bool Italic = false;
@@ -106,6 +106,12 @@ namespace SpeechCastMe
             }
 
             //Size = (float)((int)Size);
+            FontFamily bundled = BundledFont.Resolve(Name);
+            if (bundled != null)
+            {
+                if (!bundled.IsStyleAvailable(fs)) fs = FontStyle.Regular;
+                return new Font(bundled, Size, fs);
+            }
             return new Font(Name, Size, fs);
         }
 

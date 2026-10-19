@@ -35,7 +35,10 @@ namespace SpeechCastMe
                  new System.Drawing.Text.InstalledFontCollection();
 
             FontFamily[] ffs = ifc.Families;
-            int i = 0;
+            // 内蔵フォントはインストール済み一覧に出ないので先頭に追加する
+            ComboBoxFontName.Items.Add(BundledFont.FamilyName);
+            comboBoxAAFontName.Items.Add(BundledFont.FamilyName);
+            int i = 1;
             int index = 0;
             foreach (FontFamily ff in ffs)
             {

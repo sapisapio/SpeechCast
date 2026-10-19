@@ -109,8 +109,8 @@ namespace SpeechCastMe
             if (CaptionFont.IsInitialized == false)
             {
                 CaptionFont.Colors.HighForeColor = System.Drawing.Color.White;
-                CaptionFont.Colors.LowForeColor = System.Drawing.Color.FromArgb(151, 151, 255);
-                CaptionFont.Colors.BorderColor = System.Drawing.Color.Navy;
+                CaptionFont.Colors.LowForeColor = System.Drawing.Color.White;
+                CaptionFont.Colors.BorderColor = System.Drawing.Color.Black;
                 CaptionFont.Colors.TransparentColor = System.Drawing.Color.FromArgb(8, 8, 8);
             }
 
@@ -458,7 +458,7 @@ namespace SpeechCastMe
         /// <summary>
         /// AA字幕フォント
         /// </summary>
-        public CaptionFont AACaptionFont = new CaptionFont();
+        public CaptionFont AACaptionFont = new CaptionFont { Name = "MS UI Gothic" };
 
         /// <summary>
         /// 字幕インデントONOFF

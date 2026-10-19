@@ -32,20 +32,27 @@ namespace SpeechCastMe
                 var selectFont = new Button { Text = "本文フォント：" + family, Left = 22, Top = 202, Width = 396, Height = 36 };
                 selectFont.Click += delegate {
                     using (var chooser = new FontDialog { Font = new Font(family, (float)size.Value, FontStyle.Regular, GraphicsUnit.Pixel), FontMustExist = true, ShowEffects = false })
-                        if (chooser.ShowDialog(dialog) == DialogResult.OK) { family = chooser.Font.FontFamily.Name; size.Value = Math.Max(10, Math.Min(40, (decimal)(chooser.Font.SizeInPoints * 96F / 72F))); selectFont.Text = "本文フォント：" + family; }
+                        if (ShowFontDialog(chooser, dialog)) { family = chooser.Font.FontFamily.Name; size.Value = Math.Max(10, Math.Min(40, (decimal)(chooser.Font.SizeInPoints * 96F / 72F))); selectFont.Text = "本文フォント：" + family; }
                 };
                 dialog.Controls.Add(selectFont);
                 CaptionFont pendingCaption = new CaptionFont(UserConfig.CaptionFont);
-                var caption = new Button { Text = "テロップのフォント・サイズ…", Left = 22, Top = 250, Width = 396, Height = 36 };
+                var caption = new Button { Text = "テロップのフォント・サイズ…", Left = 22, Top = 250, Width = 290, Height = 36 };
                 caption.Click += delegate {
                     using (var chooser = new FontDialog { Font = pendingCaption.CreateFont(), FontMustExist = true, ShowEffects = false })
-                        if (chooser.ShowDialog(dialog) == DialogResult.OK) {
+                        if (ShowFontDialog(chooser, dialog)) {
                             pendingCaption.Name = chooser.Font.FontFamily.Name; pendingCaption.Size = chooser.Font.SizeInPoints;
                             pendingCaption.Bold = chooser.Font.Bold; pendingCaption.Italic = chooser.Font.Italic;
                             caption.Text = pendingCaption.Name + " / " + pendingCaption.Size.ToString("0.#") + " pt";
                         }
                 };
                 dialog.Controls.Add(caption);
+                // The bundled font is not offered by the Windows font dialog.
+                var bundledCaption = new Button { Text = "内蔵フォント", Left = 318, Top = 250, Width = 100, Height = 36 };
+                bundledCaption.Click += delegate {
+                    pendingCaption.Name = BundledFont.FamilyName; pendingCaption.Bold = false; pendingCaption.Italic = false;
+                    caption.Text = "源暎エムゴ v2 Black / " + pendingCaption.Size.ToString("0.#") + " pt";
+                };
+                dialog.Controls.Add(bundledCaption);
                 var title = new CheckBox { Text = "テロップ左上にスレッド名を表示", Checked = !UserConfig.HideCaptionTitle, Left = 22, Top = 302, AutoSize = true };
                 dialog.Controls.Add(title);
                 var ok = new Button { Text = "適用", DialogResult = DialogResult.OK, Left = 238, Top = 352, Width = 86 };
@@ -59,6 +66,18 @@ namespace SpeechCastMe
                 UserConfig.CaptionFont = pendingCaption; UserConfig.CaptionFont.ClearBrushCache();
                 UserConfig.HideCaptionTitle = !title.Checked;
                 ApplyReaderAppearance(); FormCaption.Instance.Refresh();
+            }
+        }
+
+        // GDI+ rejects non-TrueType selections (e.g. CFF-based .otf) when the dialog
+        // converts its result; report that instead of letting the exception escape.
+        private static bool ShowFontDialog(FontDialog chooser, IWin32Window owner)
+        {
+            try { return chooser.ShowDialog(owner) == DialogResult.OK; }
+            catch (ArgumentException)
+            {
+                MessageBox.Show(owner, "このフォントは使用できません。TrueType形式（.ttf / .ttc）のフォントを選んでください。", "フォント", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
             }
         }
     }

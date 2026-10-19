@@ -257,9 +257,9 @@ namespace SpeechCastMe
             if (toolStripComboBoxSelectVoice.Items.Count > 0) toolStripComboBoxSelectVoice.SelectedIndex = 0;
             toolStripTrackBarVoiceVolume.Value = UserConfig.SpeakingVolume;
             toolStripTrackBarPlayVolume.Value = UserConfig.PlayVolume;
-            UserConfig.CaptionFont.Name = "Yu Gothic UI";
+            UserConfig.CaptionFont.Name = BundledFont.FamilyName;
             UserConfig.CaptionFont.Size = 30;
-            UserConfig.CaptionFont.Bold = true;
+            UserConfig.CaptionFont.Bold = false;
             UserConfig.HideCaptionTitle = false;
             FormCaption.Instance.Bounds = new Rectangle(80, 120, 680, 160);
             FormCaption.Instance.CaptionText = "描画・田・四角の輪郭 ABC 720";

@@ -84,6 +84,7 @@ class UiRegressionTests
             Check(partial > 100 && opaque > 100, "caption has antialiased alpha edges and opaque text");
             Check(bitmap.GetPixel(639,139).A == 0, "caption background remains transparent");
         }
+        BundledFontChecks(config);
         using (var caption = new FormCaption())
         using (var bitmap = new Bitmap(680, 170, PixelFormat.Format32bppArgb))
         using (var graphics = Graphics.FromImage(bitmap))
@@ -185,6 +186,43 @@ class UiRegressionTests
             form.Close();
         }
         Environment.SetEnvironmentVariable("SPEECHCAST_UI_PREVIEW", null);
+    }
+
+    static void BundledFontChecks(UserConfig config)
+    {
+        var bundledType = typeof(FormMain).Assembly.GetType("SpeechCastMe.BundledFont");
+        var family = (FontFamily)bundledType.GetProperty("Family", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null, null);
+        string familyName = (string)bundledType.GetField("FamilyName", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+        Check(family != null && family.GetName(0x0409) == familyName, "bundled caption font loads from the executable");
+        var fresh = new UserConfig();
+        fresh.Initialize();
+        Check(fresh.CaptionFont.Name == familyName && !fresh.CaptionFont.Bold && fresh.AACaptionFont.Name == "MS UI Gothic", "new settings default to the bundled font and keep the AA font");
+        Check(fresh.CaptionFont.Colors.HighForeColor.ToArgb() == Color.White.ToArgb() && fresh.CaptionFont.Colors.LowForeColor.ToArgb() == Color.White.ToArgb() && fresh.CaptionFont.Colors.BorderColor.ToArgb() == Color.Black.ToArgb(), "new settings default to white text with a black border");
+        using (var font = fresh.CaptionFont.CreateFont())
+            Check(font.FontFamily.Equals(family), "caption uses the bundled family, not an installed copy");
+        fresh.CaptionFont.Bold = true;
+        using (var font = fresh.CaptionFont.CreateFont())
+            Check(font.FontFamily.Equals(family), "bold request on the bundled font does not throw");
+        fresh.CaptionFont.Bold = false;
+        var previous = FormMain.UserConfig;
+        FormMain.UserConfig = fresh;
+        using (var bitmap = new Bitmap(640, 140, PixelFormat.Format32bppArgb))
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(Color.Transparent);
+            FormCaption.DrawCaption(graphics, new Rectangle(10, 10, 620, 120), "内蔵フォント 描画・田 ABC 720", fresh.CaptionFont, false);
+            int white = 0, black = 0;
+            for (int y = 0; y < bitmap.Height; y++)
+                for (int x = 0; x < bitmap.Width; x++)
+                {
+                    Color c = bitmap.GetPixel(x, y);
+                    if (c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240) white++;
+                    if (c.A == 255 && c.R < 16 && c.G < 16 && c.B < 16) black++;
+                }
+            Check(white > 500 && black > 500, "default caption renders white text with a black border");
+            bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "caption-bundled-render.png"), ImageFormat.Png);
+        }
+        FormMain.UserConfig = previous;
     }
 
     static JpnknFastMessage FastMessage(string thread, int number, string board = "sapio")
