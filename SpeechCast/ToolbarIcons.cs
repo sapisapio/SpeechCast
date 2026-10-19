@@ -123,6 +123,11 @@ namespace SpeechCastMe
                     g.DrawLines(pen, new[] { new PointF(4F, 16.5F), new PointF(10F, 3.5F), new PointF(16F, 16.5F) });
                     g.DrawLine(pen, 6.6F, 11.6F, 13.4F, 11.6F);
                     break;
+                case "clock":
+                    g.DrawEllipse(pen, 3.2F, 3.2F, 13.6F, 13.6F);
+                    g.DrawLine(pen, 10F, 10F, 10F, 5.8F);
+                    g.DrawLine(pen, 10F, 10F, 13.2F, 11.6F);
+                    break;
                 case "settings":
                     using (var gear = new GraphicsPath(FillMode.Alternate))
                     {

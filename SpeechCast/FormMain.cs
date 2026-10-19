@@ -1898,6 +1898,7 @@ namespace SpeechCastMe
         {
             ExitStreamMode(); // saves the stream window bounds before settings are written
             CloseTelopWindow();
+            CloseGadgets(); // saves the gadget window bounds
             ClearFastSession();
             notificationPlayer.Dispose();
             if (IsDesignPreview)

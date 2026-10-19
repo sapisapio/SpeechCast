@@ -103,6 +103,16 @@ namespace SpeechCastMe
 
         internal bool Visible { get { return bar.Visible; } }
 
+        // Extra buttons after 閉じる / 移動 / サイズ (the timer's start and reset).
+        internal void AddButton(string text, Action click)
+        {
+            int left = bar.Controls.Count * 78;
+            var button = Button(text, left);
+            button.Click += delegate { click(); };
+            bar.Controls.Add(button);
+            bar.Width = left + 80;
+        }
+
         // Hovering must not take focus away from the game or the browser underneath.
         private sealed class QuietForm : Form
         {

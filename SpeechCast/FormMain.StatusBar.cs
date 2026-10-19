@@ -33,6 +33,7 @@ namespace SpeechCastMe
             telopInputButton.Margin = new Padding(0, 1, 0, 1);
             telopInputButton.Click += delegate { openResCaptionForm(); };
             toolStripButtonOpenResCaptionForm.CheckedChanged += delegate { telopInputButton.Checked = toolStripButtonOpenResCaptionForm.Checked; };
+            InitializeGadgetUi(); // left of テロップ入力
             statusStrip1.Items.Add(telopInputButton);
         }
     }

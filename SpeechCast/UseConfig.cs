@@ -151,6 +151,23 @@ namespace SpeechCastMe
         public int TelopFontSize = 40;
 
         /// <summary>
+        /// ガジェット（時計・タイマー）の窓の位置と大きさ、色（アプリのテーマとは別）、タイマーの設定
+        /// </summary>
+        public string GadgetTheme = "dark";
+        public Rectangle ClockBounds;
+        public bool ClockOpen; // reopen the clock at start-up
+        public Rectangle CountdownBounds;
+        public Rectangle CountUpBounds;
+        public Rectangle PomodoroBounds;
+        public Rectangle AlarmBounds;
+        public int TimerCountdownSeconds = 15 * 60;
+        public int PomodoroFocusMinutes = 25;
+        public int PomodoroBreakMinutes = 5;
+        public int PomodoroLongBreakMinutes = 15;
+        public string AlarmTime = "";
+        public int GadgetVolume = 80;
+
+        /// <summary>
         /// 字幕フォントのウィンドウ位置
         /// </summary>
         public Rectangle FormCaptionRect;
