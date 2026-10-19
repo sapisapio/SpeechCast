@@ -43,18 +43,27 @@ function anchorSnapshot(){
 }
 function restoreAnchor(saved){scrollToY(saved.node?scrollTop()+saved.node.getBoundingClientRect().top-saved.offset:saved.top);}
 function addRes(res){var top=scrollTop(),node=document.createElement('div');node.innerHTML=res;document.getElementById('resArea').appendChild(node);countRes(node);if(currentRes)markCurrent();scrollToY(top);}
+// Many replies at once (a thread load): count and insert them in one go, so the page is laid out
+// once instead of once per reply (thousands of replies otherwise froze the window for a minute).
+function addResBatch(html){var top=scrollTop(),box=document.createElement('div'),frag=document.createDocumentFragment(),nodes=[],n;box.innerHTML=html;
+ var dirty={r:{},i:{}},k;
+ while((n=box.firstChild)){box.removeChild(n);if(n.nodeType===1){countRes(n,dirty);nodes.push(n);}frag.appendChild(n);}
+ for(k in dirty.r)paintRef(k);for(k in dirty.i)paintId(k);
+ document.getElementById('resArea').appendChild(frag);if(currentRes)markCurrent();scrollToY(top);}
 // Reply and per-ID post counts colour numbers (blue / purple 1+ / red 3+) and IDs (2+ / 5+).
 var refs={},ids={},numberEls={},idEls={};
 function hasClass(e,c){return (' '+e.className+' ').indexOf(' '+c+' ')>=0;}
 function setLevel(e,base,level){e.className=base+(level?' '+level:'');}
 function paintRef(k){var e=numberEls[k];if(!e)return;var n=refs[k]||0;setLevel(e,'field number',n>=3?'ref3':n>=1?'ref1':'');}
 function paintId(k){var n=ids[k]||0,list=idEls[k]||[];for(var i=0;i<list.length;i++){setLevel(list[i],'field identity',n>=5?'id5':n>=2?'id2':'');var c=list[i].getElementsByTagName('span');if(c.length)c[0].innerHTML='('+n+')';}}
-function countRes(node){var a=node.getElementsByTagName('a'),s=node.getElementsByTagName('span'),i,k;
+// With dirty given, keys are only collected and painted once afterwards: repainting every post of
+// an ID on each new post is quadratic and froze threads of thousands of replies.
+function countRes(node,dirty){var a=node.getElementsByTagName('a'),s=node.getElementsByTagName('span'),i,k;
  for(i=0;i<s.length;i++){k=s[i].getAttribute('data-key');if(!k)continue;
-  if(hasClass(s[i],'number')){numberEls[k]=s[i];paintRef(k);}
-  else if(hasClass(s[i],'identity')){ids[k]=(ids[k]||0)+1;(idEls[k]=idEls[k]||[]).push(s[i]);paintId(k);}}
- for(i=0;i<a.length;i++)if(a[i].className==='reply'){k=a[i].getAttribute('data-key');refs[k]=(refs[k]||0)+1;paintRef(k);}}
-function recount(){refs={};ids={};numberEls={};idEls={};var c=document.getElementById('resArea').childNodes;for(var i=0;i<c.length;i++)if(c[i].nodeType===1)countRes(c[i]);}
+  if(hasClass(s[i],'number')){numberEls[k]=s[i];if(dirty)dirty.r[k]=1;else paintRef(k);}
+  else if(hasClass(s[i],'identity')){ids[k]=(ids[k]||0)+1;(idEls[k]=idEls[k]||[]).push(s[i]);if(dirty)dirty.i[k]=1;else paintId(k);}}
+ for(i=0;i<a.length;i++)if(a[i].className==='reply'){k=a[i].getAttribute('data-key');refs[k]=(refs[k]||0)+1;if(dirty)dirty.r[k]=1;else paintRef(k);}}
+function recount(){refs={};ids={};numberEls={};idEls={};var c=document.getElementById('resArea').childNodes,d={r:{},i:{}},k;for(var i=0;i<c.length;i++)if(c[i].nodeType===1)countRes(c[i],d);for(k in d.r)paintRef(k);for(k in d.i)paintId(k);}
 var currentRes=0;
 function markCurrent(){var a=document.getElementsByName('res'+currentRes);if(a.length&&a[0].parentNode.className.indexOf(' current')<0)a[0].parentNode.className+=' current';return a.length?a[0].parentNode:null;}
 function setCurrent(n,follow){var old=document.getElementsByClassName('current');for(var i=old.length-1;i>=0;i--)old[i].className=old[i].className.replace(' current','');currentRes=n;var c=markCurrent();if(!c||!follow)return;var r=c.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;if(r.top<0||r.bottom>h)scrollToY(scrollTop()+r.top-Math.round(h/3));}

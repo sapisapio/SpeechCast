@@ -874,11 +874,11 @@ namespace SpeechCastMe
                         Object[] objArray = new Object[1];
                         objArray[0] = UserConfig.magnification;
                         webBrowser.Document.InvokeScript("setZoom", objArray);
+                        // One call for all new replies: per-reply insertion re-laid the page out every time.
+                        var batch = new StringBuilder();
                         for (int idx = oldResCount; idx < responses.Count; idx++)
-                        {
-                            objArray[0] = responses[idx].Html;
-                            webBrowser.Document.InvokeScript("addRes", objArray);
-                        }
+                            batch.Append("<div>").Append(responses[idx].Html).Append("</div>");
+                        if (batch.Length > 0) webBrowser.Document.InvokeScript("addResBatch", new object[] { batch.ToString() });
                         if (rebuildScrollTop >= 0) webBrowser.Document.InvokeScript("scrollToY", new object[] { rebuildScrollTop });
                         if (moveScrollBottom)
                         {
