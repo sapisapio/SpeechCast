@@ -13,7 +13,7 @@ namespace SpeechCastMe
         private void InitializeReaderUi()
         {
             Font = new Font("Yu Gothic UI", 10F);
-            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            Icon = AppIcon.Value;
             BackColor = Color.FromArgb(248, 250, 252);
             MinimumSize = new Size(240, 220);
             // 2026-10-18: keep the original three rows and their existing handlers.
@@ -103,6 +103,7 @@ namespace SpeechCastMe
                 DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信用のコメント窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）  F11" };
             streamButton.Click += delegate { ToggleStreamMode(); };
             menuStrip1.Items.Add(streamButton);
+            InitializeTelopUi();
 
             foreach (var strip in new ToolStrip[] { myToolStripVoice, myToolStripPlay, myToolStripBrowser, myToolStripUrl, menuStrip1 })
             {
@@ -223,6 +224,7 @@ namespace SpeechCastMe
             if (UserConfig != null && UserConfig.CommentLayout == "named") { UserConfig.CommentLayout = "two"; UserConfig.CommentShowName = true; }
             if (webBrowser.Document != null) webBrowser.Document.InvokeScript("setZoom", new object[] { 1 });
             ApplyReaderAppearance();
+            SyncTelopUi(); // settings are loaded by now
             BeginInvoke(new Action(OpenLastOnStartup));
         }
 

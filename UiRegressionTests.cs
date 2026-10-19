@@ -272,6 +272,7 @@ class UiRegressionTests
             ReadingChecks(form, browser);
             StreamChecks(form);
             OpenBoardChecks(form);
+            TelopChecks(form);
             foreach (var name in new[] { "toolStripButtonCaption", "toolStripButtonShowCaptionImmediately", "toolStripButtonBorder", "toolStripButtonOpenResCaptionForm", "toolStripButtonFirst", "toolStripButtonMoveBottom" })
             {
                 var button = (ToolStripButton)typeof(FormMain).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).GetValue(form);
@@ -455,6 +456,68 @@ class UiRegressionTests
         form.SetAutoAdvance(true);
         form.AutoUpdate = false; form.AutoUpdate = true;
         FastSnapshotChecks(form,browser,replies,apply);
+    }
+
+    static void TelopChecks(FormMain form)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
+        Func<string, object> get = name => typeof(FormMain).GetField(name, flags).GetValue(form);
+        var split = (SplitContainer)get("splitContainerResCaption");
+        var inputButton = (ToolStripButton)get("toolStripButtonOpenResCaptionForm");
+        var toggleInput = typeof(FormMain).GetMethod("ToggleTelopInput", flags);
+        split.Panel2.Enabled = true;
+        toggleInput.Invoke(form, null);
+        Application.DoEvents();
+        Check(!split.Panel2Collapsed && split.Panel2.Height >= 20 && inputButton.Checked, "free telop input opens on the first click");
+        toggleInput.Invoke(form, null);
+        Check(split.Panel2Collapsed && !inputButton.Checked, "free telop input closes on the next click");
+
+        var textBox = (TextBox)get("textBoxDefaultCaption");
+        textBox.Text = "配信中です";
+        Check(FormMain.UserConfig.CaptionTextBuffer == "配信中です", "free telop text is kept in the settings");
+        form.AutoUpdate = false; form.AutoUpdate = true;
+        Check(form.CaptionTextBuffer == "", "the main caption no longer shows the free telop text between replies");
+
+        var render = form.GetType().Assembly.GetType("SpeechCastMe.FormFreeTelop").GetMethod("RenderFrame", BindingFlags.NonPublic | BindingFlags.Static);
+        using (var frame = (Bitmap)render.Invoke(null, new object[] { "配信中です", new Size(400, 120) }))
+        using (var empty = (Bitmap)render.Invoke(null, new object[] { "", new Size(400, 120) }))
+        {
+            int white = 0, black = 0, visible = 0;
+            for (int y = 0; y < 120; y++) for (int x = 0; x < 400; x++)
+            {
+                Color c = frame.GetPixel(x, y);
+                if (c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240) white++;
+                if (c.A == 255 && c.R < 20 && c.G < 20 && c.B < 20) black++;
+                if (empty.GetPixel(x, y).A != 0) visible++;
+            }
+            Check(white > 200 && black > 200 && visible == 0, "free telop draws white outlined text and nothing when empty");
+            frame.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "telop-frame.png"), ImageFormat.Png);
+        }
+
+        var onScreen = new Rectangle(Screen.PrimaryScreen.WorkingArea.Left + 60, Screen.PrimaryScreen.WorkingArea.Top + 60, 500, 140);
+        FormMain.UserConfig.TelopBounds = onScreen;
+        typeof(FormMain).GetMethod("ToggleTelopWindow", flags).Invoke(form, null);
+        for (int i = 0; i < 30; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(10); }
+        var window = (Form)get("telopWindow");
+        int exStyle = GetWindowLong(window.Handle, -20);
+        Check(window.Visible && window.Bounds == onScreen && (exStyle & 0x80000) != 0 && (exStyle & 0x20) != 0 && ((ToolStripButton)get("telopButton")).Checked && ((ToolStripButton)get("telopToggle")).Checked,
+            "free telop opens as its own transparent click-through window");
+        Check((bool)window.GetType().GetProperty("LastUpdateSucceeded", flags).GetValue(window, null), "free telop window accepts its alpha frame");
+        Check(((ToolStripLabel)get("telopSizeLabel")).Text == FormMain.UserConfig.TelopFontSize + "px" && ((ToolStripDropDownButton)get("telopFontButton")).Text.Length > 0, "telop size and font are shown from start-up");
+        int size = FormMain.UserConfig.TelopFontSize;
+        typeof(FormMain).GetMethod("ChangeTelopSize", flags).Invoke(form, new object[] { 1 });
+        Check(FormMain.UserConfig.TelopFontSize == size + 1 && ((ToolStripLabel)get("telopSizeLabel")).Text == (size + 1) + "px", "telop size steps by one pixel and shows it");
+        typeof(FormMain).GetMethod("ChangeTelopSize", flags).Invoke(form, new object[] { -1 });
+        var fontButton = (ToolStripDropDownButton)get("telopFontButton");
+        FormMain.UserConfig.TelopFontName = "MS PGothic";
+        fontButton.DropDownItems[0].PerformClick();
+        Check(FormMain.UserConfig.TelopFontName == "GenEi M Gothic v2 Black" && fontButton.Text == "源暎エムゴ（内蔵）", "the font menu switches back to the bundled font in one click");
+        var toolbar = (ToolStrip)((SplitContainer)get("splitContainerpkCaption")).Panel2.Controls["telopToolbar"];
+        Check(toolbar != null && toolbar.Renderer is ReaderToolbarRenderer && ((ToolStripButton)get("telopToggle")).Image != null, "the telop row uses the same toolbar style and icons");
+        ((ToolStripButton)get("telopToggle")).PerformClick();
+        Application.DoEvents();
+        Check(get("telopWindow") == null && FormMain.UserConfig.TelopBounds == onScreen && !((ToolStripButton)get("telopButton")).Checked, "the panel toggle closes the free telop and keeps its position");
+        textBox.Text = "";
     }
 
     static void OpenBoardChecks(FormMain form)

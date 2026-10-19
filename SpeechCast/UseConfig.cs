@@ -144,6 +144,13 @@ namespace SpeechCastMe
         public Rectangle StreamOverlayBounds;
 
         /// <summary>
+        /// 自由テロップの窓の位置と大きさ・フォント（文字は CaptionTextBuffer）
+        /// </summary>
+        public Rectangle TelopBounds;
+        public string TelopFontName = BundledFont.FamilyName;
+        public int TelopFontSize = 40;
+
+        /// <summary>
         /// 字幕フォントのウィンドウ位置
         /// </summary>
         public Rectangle FormCaptionRect;

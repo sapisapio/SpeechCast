@@ -1,81 +1,37 @@
-// Stream mode: the comment feed in a click-through window with per-pixel alpha, 2026-10-19. GPLv2.
-// OBS "Window Capture" (Windows 10 1903+ method) keeps the transparency, so the
-// window can be laid over the broadcast as is. Text is drawn like the caption:
-// white with a black outline, so it stays readable on any background.
+// Stream comments: the comment feed in a transparent overlay window, 2026-10-19. GPLv2.
+// Text is drawn like the caption: white with a black outline, so it stays
+// readable on any background.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace SpeechCastMe
 {
-    internal sealed class FormStreamOverlay : Form
+    internal sealed class FormStreamOverlay : OverlayWindow
     {
         private const int Inset = 10, Gap = 6;
         private readonly Func<IList<Response>> source;
-        private readonly Timer refresh = new Timer { Interval = 250 };
-        private string renderedKey;
-        internal bool LastUpdateSucceeded { get; private set; }
 
-        public FormStreamOverlay(Func<IList<Response>> source, Rectangle bounds)
+        public FormStreamOverlay(Func<IList<Response>> source, Rectangle bounds) : base("Speech Cast SP 配信コメント", bounds)
         {
             this.source = source;
-            Text = "Speech Cast SP 配信コメント";
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.Manual;
-            Bounds = bounds;
-            TopMost = true;
-            // A size set before the handle exists is reduced by the default frame
-            // once the window is created; apply the requested bounds again.
-            Load += delegate { Bounds = bounds; };
-            ShowInTaskbar = true;
-            refresh.Tick += delegate { RenderIfChanged(); };
-            Shown += delegate { RenderIfChanged(); refresh.Start(); };
-            Move += delegate { Push(); };
-            Resize += delegate { renderedKey = null; RenderIfChanged(); };
         }
 
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var cp = base.CreateParams;
-                // Layered (per-pixel alpha), click-through, never takes focus.
-                cp.ExStyle |= 0x80000 | 0x20 | 0x08000000;
-                return cp;
-            }
-        }
-
-        protected override bool ShowWithoutActivation { get { return true; } }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) { refresh.Dispose(); if (frame != null) frame.Dispose(); }
-            base.Dispose(disposing);
-        }
-
-        private Bitmap frame;
-
-        private void RenderIfChanged()
+        protected override string RenderKey()
         {
             var responses = source();
             var config = FormMain.UserConfig;
-            if (config == null || responses == null || ClientSize.Width < 1 || ClientSize.Height < 1) return;
+            if (config == null || responses == null) return null;
             var last = responses.Count > 0 ? responses[responses.Count - 1] : null;
-            string key = string.Join("|", responses.Count, last == null ? "" : last.Number + last.RawText, responses.Count > 0 ? responses[0].Number : 0,
-                ClientSize, config.StreamFontName, config.StreamFontSize, config.CommentFontSize, config.CommentLayout,
+            return string.Join("|", responses.Count, last == null ? "" : last.Number + last.RawText, responses.Count > 0 ? responses[0].Number : 0,
+                config.StreamFontName, config.StreamFontSize, config.CommentFontSize, config.CommentLayout,
                 config.CommentShowNumber, config.CommentShowName, config.CommentShowDate, config.CommentShowTime, config.CommentShowID);
-            if (key == renderedKey) return;
-            renderedKey = key;
-            var next = RenderFrame(responses, ClientSize);
-            if (frame != null) frame.Dispose();
-            frame = next;
-            Push();
         }
+
+        protected override Bitmap Render(Size size) { return RenderFrame(source(), size); }
 
         // Newest comment at the bottom, older ones stacked above until the top edge.
         internal static Bitmap RenderFrame(IList<Response> responses, Size size)
@@ -114,7 +70,7 @@ namespace SpeechCastMe
             return bitmap;
         }
 
-        private static CaptionFont Style(string name, float pixels, Color color)
+        internal static CaptionFont Style(string name, float pixels, Color color)
         {
             var style = new CaptionFont { Name = string.IsNullOrEmpty(name) ? "Meiryo" : name, Size = pixels * 72F / 96F, BorderSize = 3, Bold = false };
             style.Colors.HighForeColor = color;
@@ -123,7 +79,7 @@ namespace SpeechCastMe
             return style;
         }
 
-        private static int Measure(Graphics g, string text, Font font, int width, StringFormat format)
+        internal static int Measure(Graphics g, string text, Font font, int width, StringFormat format)
         {
             if (string.IsNullOrEmpty(text)) return 0;
             return (int)Math.Ceiling(g.MeasureString(text, font, width, format).Height) + 2;
@@ -140,49 +96,6 @@ namespace SpeechCastMe
             if (config.CommentShowTime) { var m = Regex.Match(timestamp, @"\d{1,2}:\d{2}"); if (m.Success) parts.Add(m.Value); }
             if (config.CommentShowID && !string.IsNullOrEmpty(response.ID)) parts.Add("ID:" + response.ID);
             return string.Join(" ", parts);
-        }
-
-        private void Push()
-        {
-            if (frame == null || !IsHandleCreated) return;
-            LastUpdateSucceeded = LayeredWindow.Update(Handle, Location, frame);
-        }
-    }
-
-    internal static class LayeredWindow
-    {
-        [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
-        [StructLayout(LayoutKind.Sequential)] private struct NativeSize { public int Width, Height; }
-        [StructLayout(LayoutKind.Sequential, Pack = 1)] private struct BlendFunction { public byte Operation, Flags, ConstantAlpha, Format; }
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr destination, ref NativePoint location, ref NativeSize size, IntPtr source, ref NativePoint origin, int colorKey, ref BlendFunction blend, int flags);
-        [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hwnd);
-        [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
-        [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
-        [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
-        [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
-        [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
-
-        internal static bool Update(IntPtr window, Point location, Bitmap bitmap)
-        {
-            IntPtr screen = GetDC(IntPtr.Zero), memory = CreateCompatibleDC(screen), handle = IntPtr.Zero, previous = IntPtr.Zero;
-            try
-            {
-                handle = bitmap.GetHbitmap(Color.FromArgb(0));
-                previous = SelectObject(memory, handle);
-                var at = new NativePoint { X = location.X, Y = location.Y };
-                var origin = new NativePoint();
-                var size = new NativeSize { Width = bitmap.Width, Height = bitmap.Height };
-                var blend = new BlendFunction { ConstantAlpha = 255, Format = 1 };
-                return UpdateLayeredWindow(window, screen, ref at, ref size, memory, ref origin, 0, ref blend, 2);
-            }
-            finally
-            {
-                if (previous != IntPtr.Zero) SelectObject(memory, previous);
-                if (handle != IntPtr.Zero) DeleteObject(handle);
-                if (memory != IntPtr.Zero) DeleteDC(memory);
-                if (screen != IntPtr.Zero) ReleaseDC(IntPtr.Zero, screen);
-            }
         }
     }
 }

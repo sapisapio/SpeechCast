@@ -965,7 +965,7 @@ namespace SpeechCastMe
                     {
                         Response selected = GetSelectedResonse();
                         CurrentResNumber = selected != null ? selected.Number : responses.Count + 1;
-                        captionTextBuffer = textBoxDefaultCaption.Text;
+                        captionTextBuffer = ""; // the main caption only reads replies
                         if (!IsDesignPreview) StartSpeakingAsync();
                     }
                 }
@@ -1587,7 +1587,7 @@ namespace SpeechCastMe
                         if (UserConfig.AutoReloadAlertCaption)
                         {
                             objDate = System.DateTime.Now;
-                            CaptionTextBuffer = textBoxDefaultCaption.Text + UserConfig.AutoReloadAlertMessage;
+                            CaptionTextBuffer = UserConfig.AutoReloadAlertMessage;
                             FormCaption.Instance.CaptionText = CaptionTextBuffer;
                         }
                         if (UserConfig.AutoReloadAlertVoice)
@@ -1897,6 +1897,7 @@ namespace SpeechCastMe
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
             ExitStreamMode(); // saves the stream window bounds before settings are written
+            CloseTelopWindow();
             ClearFastSession();
             notificationPlayer.Dispose();
             if (IsDesignPreview)
@@ -1926,7 +1927,7 @@ namespace SpeechCastMe
                 if (formSettings.ShowDialog() == DialogResult.OK)
                 {
                     formSettings.GetUserConfig(UserConfig);
-                    if (!UserConfig.AutoReloadAlertCaption)CaptionTextBuffer = textBoxDefaultCaption.Text;
+                    if (!UserConfig.AutoReloadAlertCaption) CaptionTextBuffer = "";
                     FormCaption.Instance.Refresh();
                     notificationPlayer.Stop();
                     SyncAudioModeUi();
@@ -2402,23 +2403,9 @@ namespace SpeechCastMe
 
         private void openResCaptionForm()
         {
-            splitContainerResCaption.Panel2Collapsed = false;
-            if (this.splitContainerResCaption.Panel2.Height > 0)
-            {
-                int resCaptionFormHeight = this.splitContainerResCaption.SplitterDistance;
-                this.splitContainerResCaption.SplitterDistance = 4000;
-                this.splitContainerResCaption.IsSplitterFixed = true;
-                this.webBrowser.Focus();
-                this.toolStripButtonOpenResCaptionForm.Checked = false;
-            }
-            else
-            {
-                this.splitContainerResCaption.SplitterDistance = this.splitContainerResCaption.Height - 130;
-                this.splitContainerResCaption.IsSplitterFixed = false;
-                webBrowser.Document.InvokeScript("scrollByY", new object[] { this.splitContainerResCaption.Panel2.Height });
-                this.toolStripButtonOpenResCaptionForm.Checked = true;
-            }
+            ToggleTelopInput();
         }
+
         private void toolStripButtonCaptionAutoSmall_Click(object sender, EventArgs e)
         {
             UserConfig.CaptionAutoSmall = this.toolStripButtonCaptionAutoSmall.Checked;
@@ -2665,7 +2652,7 @@ namespace SpeechCastMe
 
         private void textBoxDefaultCaption_Changed(object sender, EventArgs e)
         {
-            CaptionTextBuffer = textBoxDefaultCaption.Text;
+            // The text goes to the free telop window, not the main caption.
             // ミミック勝手に改造 代替字幕の設定を保存
             UserConfig.CaptionTextBuffer = textBoxDefaultCaption.Text;
             // ミミック勝手に改造 ここまで

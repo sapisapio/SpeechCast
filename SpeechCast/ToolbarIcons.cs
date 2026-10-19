@@ -114,6 +114,10 @@ namespace SpeechCastMe
                     g.DrawLine(pen, 7F, 10F, 13F, 10F);
                     g.DrawLine(pen, 10F, 10F, 10F, 14.2F);
                     break;
+                case "font":
+                    g.DrawLines(pen, new[] { new PointF(4F, 16.5F), new PointF(10F, 3.5F), new PointF(16F, 16.5F) });
+                    g.DrawLine(pen, 6.6F, 11.6F, 13.4F, 11.6F);
+                    break;
                 case "settings":
                     using (var gear = new GraphicsPath(FillMode.Alternate))
                     {

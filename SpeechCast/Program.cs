@@ -14,6 +14,7 @@ namespace SpeechCastMe
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            AppIcon.UseAsDefault();
             Application.Run(new FormMain());
         }
     }
