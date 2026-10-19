@@ -342,6 +342,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="app3.ico" />
+    <None Include="Assets\sc-icon-master.png" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
