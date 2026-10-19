@@ -254,13 +254,19 @@ class UiRegressionTests
             var play = (ToolStrip)Field(form,"myToolStripPlay");
             var voice = (ToolStrip)Field(form,"myToolStripVoice");
             var url = (ToolStrip)Field(form,"myToolStripUrl");
-            Check(((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Alignment == ToolStripItemAlignment.Right && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Right >= play.ClientSize.Width - 16, "viewer controls are anchored to the actual right edge");
+            Check(((ToolStripItem)Field(form,"toolStripButtonThreads")).Alignment == ToolStripItemAlignment.Right && ((ToolStripItem)Field(form,"toolStripButtonResponse")).Bounds.Right >= play.ClientSize.Width - 16 && ((ToolStripItem)Field(form,"toolStripButtonThreads")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonResponse")).Bounds.Left, "thread list and write controls are anchored to the actual right edge");
             Check(play.Visible && voice.Visible && url.Visible, "voice play and URL rows are visible by default");
             Check(((ToolStripItem)Field(form,"toolStripComboBoxSelectVoice")).Owner == voice && ((ToolStripItem)Field(form,"toolStripTrackBarVoiceVolume")).Owner == voice, "voice selector and volume remain on voice row");
             Check(((ToolStripItem)Field(form,"toolStripButtonAutoUpdate")).Owner == play && ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Owner == play, "update and viewer controls share play row");
             var autoUpdate = (ToolStripButton)Field(form,"toolStripButtonAutoUpdate");
-            Check(autoUpdate.Alignment == ToolStripItemAlignment.Left && play.Items.IndexOf(autoUpdate) + 1 == play.Items.IndexOf((ToolStripItem)Field(form,"toolStripButtonFirst")), "auto update leads the playback controls");
-            Check(((ToolStripItem)Field(form,"toolStripButtonZoomOutnResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left && ((ToolStripItem)Field(form,"toolStripButtonZoomInResView")).Bounds.Left < ((ToolStripItem)Field(form,"toolStripButtonMoveBottom")).Bounds.Left, "right-aligned zoom and bottom controls keep intended order");
+            var autoScroll = (ToolStripButton)Field(form,"toolStripButtonAutoScroll");
+            Check(play.Items.IndexOf(autoUpdate) == 0 && play.Items.IndexOf(autoScroll) == 1 && play.Items.IndexOf((ToolStripItem)Field(form,"toolStripButtonMoveBottom")) == 2 && autoScroll.Text == "スクロール" && autoScroll.Enabled, "auto update, auto scroll and jump to latest lead the row");
+            Func<string, int> left = name => ((ToolStripItem)Field(form,name)).Bounds.Left;
+            Check(left("toolStripButtonMoveBottom") < left("toolStripButtonFirst") && left("toolStripButtonTurbo") < left("toolStripButtonZoomOutnResView") && left("toolStripButtonZoomOutnResView") < left("toolStripButtonZoomInResView"), "playback controls come before comment zoom");
+            bool scrolling = FormMain.UserConfig.EnableAutoScroll;
+            autoScroll.PerformClick();
+            Check(FormMain.UserConfig.EnableAutoScroll != scrolling && autoScroll.Checked == FormMain.UserConfig.EnableAutoScroll, "auto scroll button toggles the setting");
+            autoScroll.PerformClick();
             foreach (var name in new[] { "toolStripButtonCaption", "toolStripButtonShowCaptionImmediately", "toolStripButtonBorder", "toolStripButtonOpenResCaptionForm", "toolStripButtonFirst", "toolStripButtonMoveBottom" })
             {
                 var button = (ToolStripButton)typeof(FormMain).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).GetValue(form);

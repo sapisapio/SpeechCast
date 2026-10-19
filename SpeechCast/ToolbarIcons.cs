@@ -85,6 +85,10 @@ namespace SpeechCastMe
                     g.DrawLine(pen, 5.6F, 8.25F, 10.9F, 8.25F);
                     if (name == "zoomin") g.DrawLine(pen, 8.25F, 5.6F, 8.25F, 10.9F);
                     break;
+                case "autoscroll":
+                    g.DrawLines(pen, new[] { new PointF(5.5F, 5F), new PointF(10F, 9.5F), new PointF(14.5F, 5F) });
+                    g.DrawLines(pen, new[] { new PointF(5.5F, 10.5F), new PointF(10F, 15F), new PointF(14.5F, 10.5F) });
+                    break;
                 case "bottom":
                     g.DrawLine(pen, 10F, 3F, 10F, 12.5F);
                     g.DrawLines(pen, new[] { new PointF(6F, 9F), new PointF(10F, 13F), new PointF(14F, 9F) });

@@ -42,20 +42,21 @@ namespace SpeechCastMe
             toolStripButtonTurbo.Text = "ターボ";
             toolStripButtonTurbo.DisplayStyle = ToolStripItemDisplayStyle.Text;
             toolStripButtonTurbo.ToolTipText = "ターボモード ON / OFF";
-            // Auto update is the switch that matters most: first in the playback
-            // group, labelled, and highlighted while ON.
+            // The switches used every broadcast lead the row: auto update, auto
+            // scroll and jump to latest; then playback, then comment zoom.
             SetIconButton(toolStripButtonAutoUpdate, "update", "自動更新 ON / OFF（ONで末尾へ移動）");
-            toolStripButtonAutoUpdate.Text = "自動更新";
-            toolStripButtonAutoUpdate.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            toolStripButtonAutoUpdate.TextImageRelation = TextImageRelation.ImageBeforeText;
-            toolStripButtonAutoUpdate.Padding = new Padding(4, 0, 6, 0);
+            SetLabelledIcon(toolStripButtonAutoUpdate, "自動更新");
+            SetIconButton(toolStripButtonAutoScroll, "autoscroll", "自動スクロール ON / OFF（読み上げに合わせてコメント欄を送る）");
+            SetLabelledIcon(toolStripButtonAutoScroll, "スクロール");
             SetIconButton(toolStripButtonZoomOutnResView, "zoomout", "コメント文字を小さく");
             SetIconButton(toolStripButtonZoomInResView, "zoomin", "コメント文字を大きく");
             SetIconButton(toolStripButtonMoveBottom, "bottom", "最新レスへ移動");
-            readerToolbar.Items.AddRange(new ToolStripItem[] { toolStripButtonThreads, toolStripButtonResponse,
-                new ToolStripSeparator(), toolStripButtonAutoUpdate, toolStripButtonFirst, toolStripButtonPrev, toolStripButtonStop, play,
-                toolStripButtonNext, toolStripButtonLast, toolStripButtonTurbo });
-            foreach (ToolStripButton button in new[] { toolStripButtonMoveBottom, toolStripButtonZoomInResView, toolStripButtonZoomOutnResView })
+            readerToolbar.Items.AddRange(new ToolStripItem[] {
+                toolStripButtonAutoUpdate, toolStripButtonAutoScroll, toolStripButtonMoveBottom,
+                new ToolStripSeparator(), toolStripButtonFirst, toolStripButtonPrev, toolStripButtonStop, play,
+                toolStripButtonNext, toolStripButtonLast, toolStripButtonTurbo,
+                new ToolStripSeparator(), toolStripButtonZoomOutnResView, toolStripButtonZoomInResView });
+            foreach (ToolStripButton button in new[] { toolStripButtonResponse, toolStripButtonThreads })
             {
                 button.Alignment = ToolStripItemAlignment.Right;
                 readerToolbar.Items.Add(button);
@@ -159,6 +160,14 @@ namespace SpeechCastMe
         private static int ToolbarIconSize
         {
             get { using (var screen = Graphics.FromHwnd(IntPtr.Zero)) return (int)Math.Round(18 * screen.DpiX / 96F); }
+        }
+
+        private static void SetLabelledIcon(ToolStripButton button, string label)
+        {
+            button.Text = label;
+            button.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            button.TextImageRelation = TextImageRelation.ImageBeforeText;
+            button.Padding = new Padding(4, 0, 6, 0);
         }
 
         private static void SetIconButton(ToolStripButton button, string icon, string description)
@@ -267,7 +276,7 @@ namespace SpeechCastMe
             Size = new Size(760, 620);
             toolStripTextBoxURL.Text = "プレビュー：ネット接続・読み上げは行いません";
             foreach (ToolStripItem item in readerToolbar.Items)
-                if (item != toolStripButtonAutoUpdate && item != toolStripButtonZoomOutnResView && item != toolStripButtonZoomInResView && item != toolStripButtonMoveBottom) item.Enabled = false;
+                if (item != toolStripButtonAutoUpdate && item != toolStripButtonAutoScroll && item != toolStripButtonZoomOutnResView && item != toolStripButtonZoomInResView && item != toolStripButtonMoveBottom) item.Enabled = false;
             myToolStripUrl.Enabled = false;
             toolStripMenuItemBookmarks.Enabled = false;
             toolStripMenuItemSpeech.Enabled = false;
