@@ -61,11 +61,12 @@ namespace SpeechCastMe
 
                 Rectangle captionRect = this.ClientRectangle;
 
-                int offsetY = borderVisible || !FormMain.UserConfig.HideCaptionTitle ? 25 : 7;
+                int margin = BackgroundMargin;
+                int offsetY = (borderVisible || !FormMain.UserConfig.HideCaptionTitle ? 25 : 7) + margin;
                 captionRect.Y = offsetY;
-                captionRect.Height -= offsetY;
+                captionRect.Height -= offsetY + margin;
 
-                captionRect.Inflate(-10, -10);
+                captionRect.Inflate(-10 - margin, -10);
 
                 CaptionFont captionFont = FormMain.UserConfig.CaptionFont;
 
@@ -179,6 +180,13 @@ namespace SpeechCastMe
         //static Brush captionBrush = null;
 
 
+        // With a background behind the caption, its frame sits at the window edge; text and the
+        // title band keep this much room inside it.
+        internal static int BackgroundMargin
+        {
+            get { return FormMain.UserConfig != null && !string.IsNullOrEmpty(FormMain.UserConfig.CaptionBackground) && FormMain.UserConfig.CaptionBackground != "none" ? 12 : 0; }
+        }
+
         public static void DrawTitle(PaintEventArgs e)
         {
             var caption = FormCaption.Instance;
@@ -191,9 +199,10 @@ namespace SpeechCastMe
             using (var border = new Pen(FormFreeTelop.ParseColor(config.CaptionTitleBorder, Color.White)))
             {
                 string label = caption.titleText;
-                int available = Math.Max(1, caption.ClientSize.Width - 8);
+                int margin = BackgroundMargin;
+                int available = Math.Max(1, caption.ClientSize.Width - 8 - margin * 2);
                 int width = Math.Min(available, (int)Math.Ceiling(e.Graphics.MeasureString(label, font, new SizeF(100000, 1000), format).Width) + 8);
-                caption.drawRect = new Rectangle(4, 3, width, (int)Math.Ceiling(font.GetHeight(e.Graphics)) + 4);
+                caption.drawRect = new Rectangle(4 + margin, 3 + margin, width, (int)Math.Ceiling(font.GetHeight(e.Graphics)) + 4);
                 e.Graphics.FillRectangle(background, caption.drawRect);
                 // A thin edge keeps the dark band findable over dark scenes.
                 if (config.CaptionTitleBorderOn)

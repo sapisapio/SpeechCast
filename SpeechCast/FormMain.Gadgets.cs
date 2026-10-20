@@ -154,7 +154,7 @@ namespace SpeechCastMe
             if (gadget.Window != null) { CloseTimerGadget(gadget); return; }
             if (UserConfig == null) return;
             int row = timerGadgets.IndexOf(gadget) + 1;
-            gadget.Window = new FormTimerGadget(gadget.Timer, GadgetBounds(SavedBounds(gadget.Mode), GadgetArt.TimerDesign, row));
+            gadget.Window = new FormTimerGadget(gadget.Timer, GadgetBounds(SavedBounds(gadget.Mode), GadgetArt.TimerDesign, row), gadget.Title);
             gadget.Window.FormClosed += delegate { if (gadget.Window != null) CloseTimerGadget(gadget); };
             gadget.Bar = new OverlayHoverBar(gadget.Window, () => CloseTimerGadget(gadget));
             gadget.Bar.AddButton("開始/停止", () => ToggleTimerRunning(gadget));

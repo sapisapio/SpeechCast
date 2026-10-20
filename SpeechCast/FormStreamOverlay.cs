@@ -61,6 +61,7 @@ namespace SpeechCastMe
             using (var g = Graphics.FromImage(bitmap))
             {
                 g.Clear(Color.Transparent);
+                int inset = Inset;
                 bool twoLine = config.CommentLayout == "two" || config.CommentLayout == "named";
                 float pixels = Math.Max(10, Math.Min(80, config.StreamFontSize > 0 ? config.StreamFontSize : config.CommentFontSize));
                 string fontName = string.IsNullOrEmpty(config.StreamFontName) ? BundledFont.FamilyName : config.StreamFontName;
@@ -68,13 +69,13 @@ namespace SpeechCastMe
                 {
                 if (!string.IsNullOrEmpty(config.StreamTemplate) && config.StreamTemplate != StreamTemplates.Outline)
                 {
-                    StreamTemplates.Draw(g, config.StreamTemplate, responses, size, r => Header(r, config), fontName, pixels, Inset, Gap, intro);
+                    StreamTemplates.Draw(g, config.StreamTemplate, responses, size, r => Header(r, config), fontName, pixels, inset, Gap, intro);
                     return bitmap;
                 }
                 var body = Style(fontName, pixels, Color.White);
                 var meta = Style(fontName, pixels * 0.78F, Color.FromArgb(214, 222, 233));
-                int width = size.Width - Inset * 2;
-                int bottom = size.Height - Inset;
+                int width = size.Width - inset * 2;
+                int bottom = size.Height - inset;
                 using (var format = (StringFormat)StringFormat.GenericTypographic.Clone())
                 using (var bodyFont = body.CreateFont())
                 using (var metaFont = meta.CreateFont())
@@ -89,8 +90,8 @@ namespace SpeechCastMe
                         int bodyHeight = Measure(g, text, bodyFont, width, format);
                         int metaHeight = header.Length > 0 ? Measure(g, header, metaFont, width, format) : 0;
                         int top = bottom - bodyHeight - metaHeight;
-                        if (metaHeight > 0) CaptionRasterizer.DrawOutlined(d, new Rectangle(Inset, top, width, metaHeight), header, meta, false);
-                        CaptionRasterizer.DrawOutlined(d, new Rectangle(Inset, top + metaHeight, width, bodyHeight), text, body, false);
+                        if (metaHeight > 0) CaptionRasterizer.DrawOutlined(d, new Rectangle(inset, top, width, metaHeight), header, meta, false);
+                        CaptionRasterizer.DrawOutlined(d, new Rectangle(inset, top + metaHeight, width, bodyHeight), text, body, false);
                         bottom = top - Gap;
                     }
                     if (intro != null) intro.Finish(g);

@@ -415,7 +415,7 @@ class UiRegressionTests
         var type = replies[0].GetType();
         string html = (string)type.GetField("Html").GetValue(replies[0]);
         Check((int)type.GetField("Number").GetValue(replies[0]) == 1 && (int)type.GetProperty("DisplayNumber").GetValue(replies[0],null) == 50 && html.Contains("50:</span>"), "original response numbers are separate from playback queue positions");
-        Check(html.Contains("スレ 100") && html.Contains("https://bbs.jpnkn.com/test/read.cgi/sapio/100/49") && !html.Contains("<img"), "board rows identify source threads preserve reply links and escape markup");
+        Check(!html.Contains("スレ 100") && html.Contains("https://bbs.jpnkn.com/test/read.cgi/sapio/100/49") && !html.Contains("<img"), "board rows show only the reply number, keep reply links into the source thread and escape markup");
         for (int i = 1; i <= 40; i++) apply.Invoke(form,new object[] {FastMessage("300",i)});
         Script(browser,"scrollToY",300);
         int position = Convert.ToInt32(Script(browser,"scrollTop"));

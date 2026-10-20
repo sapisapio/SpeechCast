@@ -1,0 +1,3 @@
+声を選ぶ（VOICEVOX / AivisSpeech）
+VOICEVOX か AivisSpeech をインストールして起動しておくだけ。
+あとは Voice 欄から「VOICEVOX:〜」「AivisSpeech:〜」を選ぶだけです。

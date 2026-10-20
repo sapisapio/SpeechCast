@@ -394,7 +394,7 @@ namespace SpeechCastMe
 
             rect.Inflate(-10, -10);
 
-            FormCaption.DrawCaption(e.Graphics, rect, "プレビュー 123 ABC", CaptionFont, false);
+            PaintCaptionPreview(e.Graphics, rect);
         }
 
         private void ComboBoxFontName_SelectedIndexChanged(object sender, EventArgs e)

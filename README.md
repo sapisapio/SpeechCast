@@ -1,3 +1,38 @@
+# Speech Cast SP
+
+2ch・したらば・jpnkn などの掲示板のレスを読み上げ、配信画面にテロップとして出すソフトです。
+[SpeechCast](https://github.com/ggslyman/SpeechCast)（ggslyman 版）を元にした SpeechCastMe（ミミック版）を、さらに配信向けに作り直したものです。ライセンスは元と同じ GPLv2 です。
+
+- **VOICEVOX / AivisSpeech は起動しておくだけ。** あとは Voice 欄から「VOICEVOX:〜」を選ぶだけで読み上げます。
+- jpnkn Fast で、新着をすぐに受け取れます。
+- テロップに金・レインボー・ゲーミングなどの装飾と背景を付けられます。
+- 配信コメント窓、自由テロップ、時計やタイマーを、OBS のウィンドウキャプチャでそのまま取り込めます。
+
+変更点の一覧は [CHANGES.md](CHANGES.md) にあります。使い方は、アプリのメニューの ヘルプ →「使い方」と、[Readme-SP](UI-preview-notes.md) にあります。
+
+## 動作環境
+
+- Windows 10 / 11
+- .NET Framework 4.6 以上（Windows 10/11 には最初から入っています）
+
+## 始め方
+
+1. ZIP をフォルダーに展開して、`SpeechCastSP.exe` を起動します。`MQTTnet.dll` と `Tutorial` フォルダーも同じ場所に置いたままにしてください。
+2. 読ませたいスレの URL を URL 欄に貼って Enter を押します。
+3. 「自動更新」と「自動送り」を ON にすると、新しいレスが来るたびに読み上げます。
+
+## ビルド
+
+Visual Studio 2022（.NET Framework 4.6 の開発ツール、Windows 10/11 SDK）が必要です。
+
+```powershell
+msbuild SpeechCast/SpeechCastMe.csproj /restore /p:Configuration=Release /p:Platform=x86
+```
+
+---
+
+以下は元の SpeechCast の README です。
+
 #SpeechCast
 
 ##概要

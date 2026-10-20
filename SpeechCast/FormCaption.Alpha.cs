@@ -56,6 +56,8 @@ namespace SpeechCastMe
                 using (var args = new PaintEventArgs(graphics, ClientRectangle))
                 {
                     graphics.Clear(Color.Transparent);
+                    var config = FormMain.UserConfig;
+                    CaptionBackgrounds.Draw(graphics, ClientSize, config.CaptionBackground, config.CaptionBackgroundImage, config.CaptionBackgroundFit, config.CaptionBackgroundTransparency);
                     PaintCaptionContent(this, args);
                 }
                 IntPtr screen = GetDC(IntPtr.Zero);

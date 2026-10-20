@@ -13,7 +13,15 @@ namespace SpeechCastMe
         // ClearType colour fringes, or unhinted vector fill on small Japanese counters.
         internal static void Draw(Graphics target, Rectangle rectangle, string text, CaptionFont style, bool aaMode)
         {
-            rectangle.Offset(FormMain.UserConfig.CaptionIndentLeftPadding, FormMain.UserConfig.CaptionIndentTopPadding);
+            var config = FormMain.UserConfig;
+            rectangle.Offset(config.CaptionIndentLeftPadding, config.CaptionIndentTopPadding);
+            // A chosen effect (not for AA, whose shapes it would smear); 標準 keeps the original look.
+            if (!aaMode && !string.IsNullOrEmpty(config.CaptionEffect) && config.CaptionEffect != CaptionEffect.Standard)
+            {
+                var accent = FormFreeTelop.ParseColor(config.CaptionEffectColor, CaptionEffect.HasColor(config.CaptionEffect) ? ColorTranslator.FromHtml(CaptionEffect.DefaultColor(config.CaptionEffect)) : Color.White);
+                CaptionEffectRenderer.Draw(target, rectangle, text, style, aaMode, CaptionEffect.Build(config.CaptionEffect, accent, config.CaptionEffectStrength / 100F, style, config.CaptionEffectImage));
+                return;
+            }
             DrawOutlined(target, rectangle, text, style, aaMode);
         }
 

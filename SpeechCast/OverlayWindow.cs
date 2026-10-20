@@ -24,7 +24,9 @@ namespace SpeechCastMe
             StartPosition = FormStartPosition.Manual;
             Bounds = bounds;
             TopMost = true;
-            ShowInTaskbar = true;
+            // Only the main window sits in the taskbar. OBS window capture still lists and captures
+            // these by title, like the caption window, which has never been in the taskbar.
+            ShowInTaskbar = false;
             AppIcon.Apply(this);
             // A size set before the handle exists is reduced by the default frame
             // once the window is created; apply the requested bounds again.

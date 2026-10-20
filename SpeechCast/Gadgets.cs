@@ -149,7 +149,8 @@ namespace SpeechCastMe
     {
         private readonly GadgetTimer timer;
 
-        public FormTimerGadget(GadgetTimer timer, Rectangle bounds) : base("Speech Cast SP タイマー", bounds) { this.timer = timer; }
+        // The window title names the kind, so OBS can tell several timers apart.
+        public FormTimerGadget(GadgetTimer timer, Rectangle bounds, string kind) : base("Speech Cast SP " + kind, bounds) { this.timer = timer; }
 
         protected override string RenderKey()
         {

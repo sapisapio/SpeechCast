@@ -110,6 +110,9 @@ namespace SpeechCastMe
             toolStripMenuItemGoSupportBBS.Available = false;
             toolStripMenuItemGoLatestRelease.Available = false;
             toolStripSeparator3.Available = false;
+            toolStripMenuItemHelp.DropDownItems.Insert(0, new ToolStripMenuItem("使い方", null, delegate {
+                using (var guide = new FormTutorial()) guide.ShowDialog(this);
+            }));
             // Stream comments: a separate transparent window for OBS window capture.
             streamButton = new ToolStripButton("配信コメント") { Name = "streamModeButton", Alignment = ToolStripItemAlignment.Right,
                 DisplayStyle = ToolStripItemDisplayStyle.Text, ToolTipText = "配信用のコメント窓を開く / 閉じる（透過・OBSのウィンドウキャプチャ用）" };

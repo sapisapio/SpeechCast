@@ -168,6 +168,16 @@ namespace SpeechCastMe
         /// テロップ左上のスレッド名：帯・文字・枠線の色と、枠線の有無
         /// </summary>
         public string CaptionTitleBack = "#1F2937";
+        // Main caption decoration (CaptionEffect.Catalog), its color ("" = the effect's default) and strength (%).
+        public string CaptionEffect = "standard";
+        public string CaptionEffectColor = "";
+        public int CaptionEffectStrength = 100;
+        public string CaptionEffectImage = ""; // the picture for 画像で塗る
+        // Main caption window background (CaptionBackgrounds.Catalog), filling the window's area.
+        public string CaptionBackground = "none";
+        public string CaptionBackgroundImage = "";
+        public string CaptionBackgroundFit = "fill"; // stretch / fill / tile
+        public int CaptionBackgroundTransparency = 0; // %, 0 = opaque
         public string CaptionTitleText = "#EEF2F7";
         public string CaptionTitleBorder = "#FFFFFF";
         public bool CaptionTitleBorderOn = true;

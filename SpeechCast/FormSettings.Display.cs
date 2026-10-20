@@ -34,6 +34,16 @@ namespace SpeechCastMe
         private CheckBox hotkeysOn;
         private TextBox[] hotkeyBoxes;
         private Keys[] hotkeyKeys;
+        // 字幕: decoration
+        private ComboBox captionEffect;
+        private Button captionEffectColor;
+        private string captionEffectHtml, captionEffectImagePath;
+        private TrackBar captionEffectStrength;
+        // 字幕: background of the caption window
+        private ComboBox captionBackground, captionBackgroundFit;
+        private Button captionBackgroundImage;
+        private string captionBackgroundPath;
+        private TrackBar captionBackgroundTransparency;
         // 通信: reopen the last thread at start-up
         private CheckBox reopenLast;
         // 字幕: the thread name band
@@ -117,7 +127,7 @@ namespace SpeechCastMe
             y += 36;
             streamIntro = new CheckBox { Text = "新着をスライドで表示する", Left = 20, Top = y, AutoSize = true };
             stream.Controls.Add(streamIntro);
-            y += 32;
+            y += 34;
             stream.Controls.Add(Hint("メニューバーの「表示設定」からも同じ設定をすぐ切り替えられます。", 12, y));
 
             var gadget = Page("ガジェット");
@@ -129,7 +139,7 @@ namespace SpeechCastMe
             gadget.Controls.AddRange(new Control[] { gadgetDark, gadgetLight });
             y += 36;
             gadget.Controls.Add(Caption("音量", 12, y + 6));
-            gadgetVolume = new TrackBar { Minimum = 0, Maximum = 100, TickStyle = TickStyle.None, Left = 124, Top = y, Width = 220 };
+            gadgetVolume = new TrackBar { Minimum = 0, Maximum = 100, TickStyle = TickStyle.None, BackColor = TabBodyColor(), Left = 124, Top = y, Width = 220 };
             gadgetVolumeText = new Label { Left = 350, Top = y + 6, Width = 40 };
             gadgetVolume.ValueChanged += delegate { gadgetVolumeText.Text = gadgetVolume.Value.ToString(); };
             gadget.Controls.AddRange(new Control[] { gadgetVolume, gadgetVolumeText });
@@ -197,6 +207,39 @@ namespace SpeechCastMe
             titleBorderButton = ColorButton("枠線の色", 208, 52, () => titleBorder, v => titleBorder = v, "#FFFFFF");
             title.Controls.AddRange(new Control[] { titleShown, titleEdge, titleBackButton, titleTextButton, titleBorderButton });
             tabPage2.Controls.Add(title);
+            // 字幕: decoration under the preview; changes show in the preview at once.
+            tabPage2.Controls.Add(Caption("装飾", 13, 376));
+            captionEffect = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 60, Top = 372, Width = 180 };
+            foreach (var entry in CaptionEffect.Catalog) captionEffect.Items.Add(entry[1]);
+            captionEffectColor = new Button { Text = "色", Left = 248, Top = 371, Width = 64, Height = 26, TextImageRelation = TextImageRelation.ImageBeforeText };
+            captionEffectColor.Click += delegate {
+                if (EffectId() == "image")
+                {
+                    var path = PickImage(captionEffectImagePath);
+                    if (path != null) { captionEffectImagePath = path; panelPreview.Refresh(); }
+                    return;
+                }
+                using (var dialog = new ColorDialog { FullOpen = true, Color = EffectColor() })
+                    if (dialog.ShowDialog(this) == DialogResult.OK) { captionEffectHtml = Html(dialog.Color); Swatch(captionEffectColor, dialog.Color); panelPreview.Refresh(); }
+            };
+            tabPage2.Controls.Add(Caption("強さ", 322, 376));
+            captionEffectStrength = new TrackBar { Minimum = 30, Maximum = 300, TickStyle = TickStyle.None, BackColor = TabBodyColor(), Left = 356, Top = 368, Width = 190 };
+            captionEffect.SelectedIndexChanged += delegate { captionEffectHtml = ""; SyncEffectButton(); panelPreview.Refresh(); };
+            captionEffectStrength.ValueChanged += delegate { panelPreview.Refresh(); };
+            tabPage2.Controls.AddRange(new Control[] { captionEffect, captionEffectColor, captionEffectStrength });
+            // The window's background: fills the area set with the position frame (the toolbar's frame button).
+            tabPage2.Controls.Add(Caption("背景", 13, 412));
+            captionBackground = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 60, Top = 408, Width = 180 };
+            foreach (var entry in CaptionBackgrounds.Catalog) captionBackground.Items.Add(entry[1]);
+            captionBackgroundImage = new Button { Text = "画像…", Left = 248, Top = 407, Width = 64, Height = 26 };
+            captionBackgroundImage.Click += delegate { var path = PickImage(captionBackgroundPath); if (path != null) { captionBackgroundPath = path; captionBackground.SelectedIndex = captionBackground.Items.Count - 1; panelPreview.Refresh(); } };
+            captionBackgroundFit = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 318, Top = 408, Width = 120 };
+            foreach (var fit in CaptionBackgrounds.ImageFits) captionBackgroundFit.Items.Add(fit[1]);
+            tabPage2.Controls.Add(Caption("透明度", 446, 412));
+            captionBackgroundTransparency = new TrackBar { Minimum = 0, Maximum = 90, TickStyle = TickStyle.None, BackColor = TabBodyColor(), Left = 490, Top = 404, Width = 96 };
+            foreach (Control c in new Control[] { captionBackground, captionBackgroundFit }) ((ComboBox)c).SelectedIndexChanged += delegate { panelPreview.Refresh(); };
+            captionBackgroundTransparency.ValueChanged += delegate { panelPreview.Refresh(); };
+            tabPage2.Controls.AddRange(new Control[] { captionBackground, captionBackgroundImage, captionBackgroundFit, captionBackgroundTransparency });
 
             // In order: 音声 字幕 AAモード 表示 配信コメント ガジェット 通信 NGWord 読み方 着信音 その他.
             // (TabPages.Insert is ignored before the control has a handle, so rebuild the list.)
@@ -246,6 +289,15 @@ namespace SpeechCastMe
             gadgetVolumeText.Text = gadgetVolume.Value.ToString();
 
             reopenLast.Checked = c.OpenLastOnStartup;
+            captionEffect.SelectedIndex = Math.Max(0, Array.FindIndex(CaptionEffect.Catalog, e => (string)e[0] == c.CaptionEffect));
+            captionEffectHtml = c.CaptionEffectColor; // after the index, whose change resets it
+            captionEffectImagePath = c.CaptionEffectImage;
+            SyncEffectButton();
+            captionEffectStrength.Value = Math.Max(30, Math.Min(300, c.CaptionEffectStrength));
+            captionBackgroundPath = c.CaptionBackgroundImage;
+            captionBackground.SelectedIndex = Math.Max(0, Array.FindIndex(CaptionBackgrounds.Catalog, e => e[0] == c.CaptionBackground));
+            captionBackgroundFit.SelectedIndex = Math.Max(0, Array.FindIndex(CaptionBackgrounds.ImageFits, e => e[0] == c.CaptionBackgroundFit));
+            captionBackgroundTransparency.Value = Math.Max(0, Math.Min(90, c.CaptionBackgroundTransparency));
             hotkeysOn.Checked = c.HotkeysEnabled;
             for (int i = 0; i < hotkeyKeys.Length; i++)
             {
@@ -284,12 +336,85 @@ namespace SpeechCastMe
             c.GadgetVolume = gadgetVolume.Value;
 
             c.OpenLastOnStartup = reopenLast.Checked;
+            c.CaptionEffect = (string)CaptionEffect.Catalog[Math.Max(0, captionEffect.SelectedIndex)][0];
+            c.CaptionEffectColor = captionEffectHtml ?? "";
+            c.CaptionEffectStrength = captionEffectStrength.Value;
+            c.CaptionEffectImage = captionEffectImagePath ?? "";
+            c.CaptionBackground = CaptionBackgrounds.Catalog[Math.Max(0, captionBackground.SelectedIndex)][0];
+            c.CaptionBackgroundImage = captionBackgroundPath ?? "";
+            c.CaptionBackgroundFit = CaptionBackgrounds.ImageFits[Math.Max(0, captionBackgroundFit.SelectedIndex)][0];
+            c.CaptionBackgroundTransparency = captionBackgroundTransparency.Value;
             c.HotkeysEnabled = hotkeysOn.Checked;
             c.Hotkeys = new List<string>();
             for (int i = 0; i < hotkeyKeys.Length; i++) c.Hotkeys.Add(FormMain.HotkeyActions[i][0] + "=" + (int)hotkeyKeys[i]);
             c.HideCaptionTitle = !titleShown.Checked;
             c.CaptionTitleBorderOn = titleEdge.Checked;
             c.CaptionTitleBack = titleBack; c.CaptionTitleText = titleText; c.CaptionTitleBorder = titleBorder;
+        }
+
+        private string EffectId() { return (string)CaptionEffect.Catalog[Math.Max(0, captionEffect.SelectedIndex)][0]; }
+
+        private Color EffectColor()
+        {
+            string id = EffectId();
+            return CaptionEffect.HasColor(id) ? FormFreeTelop.ParseColor(captionEffectHtml, ColorTranslator.FromHtml(CaptionEffect.DefaultColor(id))) : Color.White;
+        }
+
+        // 色 for effects with a color, 画像… for 画像で塗る, unavailable for the materials.
+        private void SyncEffectButton()
+        {
+            string id = EffectId();
+            bool image = id == "image";
+            captionEffectColor.Text = image ? "画像…" : "色";
+            captionEffectColor.Enabled = image || CaptionEffect.HasColor(id);
+            if (image || !CaptionEffect.HasColor(id)) { if (captionEffectColor.Image != null) captionEffectColor.Image.Dispose(); captionEffectColor.Image = null; }
+            else Swatch(captionEffectColor, EffectColor());
+        }
+
+        // The 字幕 preview: the font from this dialog with the decoration chosen here.
+        private void PaintCaptionPreview(Graphics g, Rectangle rect)
+        {
+            const string sample = "プレビュー 123 ABC";
+            // The background chosen here, behind the text, filling the preview.
+            if (captionBackground != null && captionBackground.SelectedIndex > 0)
+            {
+                var area = Rectangle.Inflate(rect, 10, 10);
+                var state = g.Save();
+                g.TranslateTransform(area.X, area.Y);
+                CaptionBackgrounds.Draw(g, area.Size, CaptionBackgrounds.Catalog[captionBackground.SelectedIndex][0], captionBackgroundPath,
+                    CaptionBackgrounds.ImageFits[Math.Max(0, captionBackgroundFit.SelectedIndex)][0], captionBackgroundTransparency.Value);
+                g.Restore(state);
+                rect = Rectangle.Inflate(rect, -12, -12);
+            }
+            string id = captionEffect == null ? CaptionEffect.Standard : EffectId();
+            if (id == CaptionEffect.Standard) { CaptionRasterizer.DrawOutlined(g, rect, sample, CaptionFont, false); return; } // not the saved effect
+            var style = CaptionFont;
+            CaptionEffectRenderer.Draw(g, rect, sample, style, false, CaptionEffect.Build(id, EffectColor(), captionEffectStrength.Value / 100F, style, captionEffectImagePath));
+        }
+
+        internal static string PickImage(string current)
+        {
+            using (var dialog = new OpenFileDialog { Title = "背景の画像", Filter = "画像 (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|すべてのファイル|*.*" })
+            {
+                if (!string.IsNullOrEmpty(current) && System.IO.File.Exists(current)) dialog.FileName = current;
+                return dialog.ShowDialog() == DialogResult.OK ? dialog.FileName : null;
+            }
+        }
+
+        // The themed tab page paints a body color of its own (not BackColor); sliders on it need the same.
+        private static Color TabBodyColor()
+        {
+            if (!System.Windows.Forms.VisualStyles.VisualStyleRenderer.IsSupported) return SystemColors.Control;
+            try
+            {
+                using (var sample = new Bitmap(40, 40))
+                using (var g = Graphics.FromImage(sample))
+                {
+                    new System.Windows.Forms.VisualStyles.VisualStyleRenderer(System.Windows.Forms.VisualStyles.VisualStyleElement.Tab.Body.Normal).DrawBackground(g, new Rectangle(0, 0, 40, 40));
+                    return sample.GetPixel(20, 20);
+                }
+            }
+            catch (InvalidOperationException) { return SystemColors.Control; }
         }
 
         private TabPage Page(string text) { return new TabPage(text) { UseVisualStyleBackColor = true, Padding = new Padding(3) }; }

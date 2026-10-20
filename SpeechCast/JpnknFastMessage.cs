@@ -80,8 +80,8 @@ namespace SpeechCastMe
         internal Response ToResponse(int ordinal, bool boardFeed, string title)
         {
             var response = new Response { Number = ordinal, SourceNumber = Number,
-                SourceThreadUrl = "https://bbs.jpnkn.com/test/read.cgi/" + Board + "/" + Thread + "/",
-                SourceLabel = boardFeed ? "スレ " + Thread : null };
+                // No "スレ <key>" label in the board feed: the long thread key is noise; the reply number is enough.
+                SourceThreadUrl = "https://bbs.jpnkn.com/test/read.cgi/" + Board + "/" + Thread + "/" };
             if (!response.SetRawText(Body)) return null;
             response.ThreadTitle = title;
             return response;
