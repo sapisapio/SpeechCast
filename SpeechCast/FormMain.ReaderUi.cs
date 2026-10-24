@@ -59,9 +59,15 @@ namespace SpeechCastMe
             SetIconButton(toolStripButtonOpenResCaptionForm, "altcaption", "テロップ入力の表示切替");
             toolStripLabel3.Text = "音量";
             toolStripLabel8.Text = "着信音量";
-            toolStripComboBoxSelectVoice.Width = 132;
+            // Wide enough for "VOICEVOX:四国めたん（ノーマル）"; the list opens wider still.
+            toolStripComboBoxSelectVoice.Width = 230;
+            toolStripComboBoxSelectVoice.DropDownWidth = 300;
             toolStripTrackBarVoiceVolume.Width = 80;
             toolStripTrackBarPlayVolume.Width = 65;
+            // The notification volume is typed into its box (the slider stays hidden but still holds the value);
+            // the telop input toggle is in the status bar (テロップ入力).
+            foreach (ToolStripItem item in new ToolStripItem[] { toolStripButtonOpenResCaptionForm, toolStripTrackBarPlayVolume })
+                item.Available = false;
 
             var appearance = new ToolStripDropDownButton("表示") { DisplayStyle = ToolStripItemDisplayStyle.Text };
             AddAppearanceItem(appearance, "1行モード（項目と本文を横並び）", "one", null);

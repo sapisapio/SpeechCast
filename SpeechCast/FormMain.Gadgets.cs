@@ -172,6 +172,9 @@ namespace SpeechCastMe
             var window = gadget.Window;
             gadget.Window = null;
             SavedBounds(gadget.Mode) = window.Bounds;
+            // Hidden means off: a closed timer neither keeps counting nor rings.
+            StopGadgetSound(gadget);
+            gadget.Timer.Reset();
             gadget.Bar.Dispose(); gadget.Bar = null;
             if (!window.IsDisposed) { window.Close(); window.Dispose(); }
         }
